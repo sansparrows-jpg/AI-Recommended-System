@@ -1,16 +1,45 @@
-# Score Comparison % Ranking Module
-# This module combines the recommendation
-# results term:
-# 1. Content-Based Filtering
-# 2. Collaborative Filtering 
-# 3. Hybrid Recommendation
-
-# Ranking Factors:
-# - Similarity Score
-# - Predicted Rating 
-# - Popularity
-# - Dynamic Weight
 import streamlit as st
+
+
+MODULE_QUOTAS = {
+    "content": 3,
+    "collaborative": 3,
+    "hybrid": 3,
+}
+
+
+def _module_score(song, module_name):
+    if module_name == "content":
+        return song.get("similarity", 0)
+
+    if module_name == "collaborative":
+        return song.get("rating", 0) / 5
+
+    return song.get("score", 0)
+
+
+def _add_candidate(final_scores, song, module_name):
+    track = song["track_name"]
+    score = _module_score(song, module_name)
+
+    if track not in final_scores:
+        final_scores[track] = {
+            "track_name": track,
+            "artist": song["artist"],
+            "genre": song["genre"],
+            "mood": song["mood"],
+            "popularity": song.get("popularity", 0),
+            "source_modules": [module_name],
+            "score_total": score,
+            "score_count": 1,
+        }
+        return
+
+    if module_name not in final_scores[track]["source_modules"]:
+        final_scores[track]["source_modules"].append(module_name)
+        final_scores[track]["score_total"] += score
+        final_scores[track]["score_count"] += 1
+
 
 @st.cache_data
 def generate_final_recommendations(
@@ -25,139 +54,41 @@ def generate_final_recommendations(
 ):
 
     final_scores = {}
+    module_results = [
+        ("content", content_results),
+        ("collaborative", collaborative_results),
+        ("hybrid", hybrid_results),
+    ]
 
-    # Dynamic Weight 
-    if len(collaborative_results) == 0:
-        weights = {
-            "content": 0.60,
-            "collaborative": 0.00,
-            "hybrid": 0.25,
-            "popularity": 0.15
-        }
+    for module_name, results in module_results:
+        for song in results[:MODULE_QUOTAS[module_name]]:
+            _add_candidate(final_scores, song, module_name)
 
-    elif len(collaborative_results) < 5:
-        weights = {
-            "content": 0.35,
-            "collaborative": 0.15,
-            "hybrid": 0.35,
-            "popularity": 0.15
-        }
+    if len(final_scores) < top_n:
+        for module_name, results in module_results:
+            for song in results[MODULE_QUOTAS[module_name]:]:
+                _add_candidate(final_scores, song, module_name)
 
-    else: 
-        weights = {
-            "content": 0.25,
-            "collaborative": 0.25,
-            "hybrid": 0.35,
-            "popularity": 0.15
-        }
+                if len(final_scores) == top_n:
+                    break
 
-    # Content-Based Weight (30%)
-    for song in content_results:
-
-        track = song["track_name"]
-
-        similarity = song.get("similarity", 0)
-
-        popularity = song.get("popularity", 0) / 100
-
-        final_scores[track] = {
-
-            "track_name": track,
-
-            "artist": song["artist"],
-
-            "genre": song["genre"],
-
-            "mood": song["mood"],
-
-            "popularity": song.get("popularity", 0),
-
-            "final_score": 
-                similarity * weights["content"] +
-                popularity * weights["popularity"]
-        }
-
-    # Collaborative Weight (30%)
-
-    for song in collaborative_results:
-
-        track = song["track_name"]
-
-        rating = song.get("rating", 0) / 5
-
-        popularity = song.get("popularity", 0) /100
-
-        if track in final_scores:
-
-            final_scores[track]["final_score"] += (
-                rating * weights["collaborative"]
-            )
-
-        else:
-
-            final_scores[track] = {
-
-                "track_name": track,
-
-                "artist": song["artist"],
-
-                "genre": song["genre"],
-
-                "mood": song["mood"],
-
-                "popularity": song.get("popularity", 0),
-
-                "final_score": 
-                    rating * weights["collaborative"] +
-                    popularity * weights["popularity"]
-
-            }
-
-    # Hybrid Weight (40%)
-
-    for song in hybrid_results:
-
-        track = song["track_name"]
-
-        hybrid_score = song.get("score", 0)
-
-        popularity = song.get("popularity", 0) / 100
-
-        if track in final_scores:
-
-            final_scores[track]["final_score"] += ( 
-                hybrid_score * weights["hybrid"]
-            )
-        else:
-
-            final_scores[track] = {
-
-                "track_name": track,
-
-                "artist": song["artist"],
-
-                "genre": song["genre"],
-
-                "mood": song["mood"],
-
-                "popularity": song.get("popularity", 0),
-
-                "final_score": 
-                    hybrid_score * weights["hybrid"] +
-                    popularity * weights["popularity"]
-
-            }
-
-    # Ranking
-    # Convert Dictionary to List
+            if len(final_scores) == top_n:
+                break
 
     ranked_songs = list(final_scores.values())
 
-    # Sort by Final Score
+    for song in ranked_songs:
+        song["final_score"] = (
+            song["score_total"] / song["score_count"]
+        )
 
     ranked_songs.sort(
 
-        key=lambda x: x["final_score"],
+        key=lambda x: (
+            x["final_score"],
+            x["score_count"],
+            x["popularity"],
+        ),
 
         reverse=True
     )
@@ -171,6 +102,9 @@ def generate_final_recommendations(
             song["final_score"],
             3
         )
+
+        del song["score_total"]
+        del song["score_count"]
 
     return ranked_songs[:top_n]
 # Test

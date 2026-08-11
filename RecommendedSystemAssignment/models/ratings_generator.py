@@ -26,13 +26,13 @@ def generate_user_ratings():
         subset="track_name"
     )
 
-    # Select useful columns only
-
     songs = songs[
         [
             "track_name",
             "artists",
-            "track_genre"
+            "track_genre",
+            "mood",
+            "popularity",
         ]
     ]
 
@@ -40,9 +40,45 @@ def generate_user_ratings():
 
     number_of_users = 100
 
-    minimum_ratings = 30
+    minimum_ratings = 60
 
-    maximum_ratings = 50
+    maximum_ratings = 70
+
+    profile_count = 5
+
+    common_genres = (
+        songs["track_genre"]
+        .value_counts()
+        .head(profile_count)
+        .index
+        .tolist()
+    )
+
+    common_moods = (
+        songs["mood"]
+        .value_counts()
+        .index
+        .tolist()
+    )
+
+    user_profiles = []
+
+    for profile_index in range(profile_count):
+        favourite_genre = common_genres[profile_index % len(common_genres)]
+        favourite_mood = common_moods[profile_index % len(common_moods)]
+        profile_songs = songs[
+            (songs["track_genre"] == favourite_genre)
+            | (songs["mood"] == favourite_mood)
+        ].sort_values("popularity", ascending=False)
+
+        user_profiles.append(
+            {
+                "genre": favourite_genre,
+                "mood": favourite_mood,
+                "shared_songs": profile_songs.head(55),
+                "candidate_songs": profile_songs,
+            }
+        )
 
 
     ratings = []
@@ -52,6 +88,7 @@ def generate_user_ratings():
     for user in range(1, number_of_users + 1):
 
         user_id = f"User{user:03d}"
+        profile = user_profiles[(user - 1) % profile_count]
 
 
         # Randomly choose how many songs this
@@ -62,16 +99,52 @@ def generate_user_ratings():
         )
 
 
-        # Randomly choose songs
-        selected_songs = songs.sample(
-            total_ratings,
-            random_state=RANDOM_SEED + user
+        shared_count = min(
+            55,
+            len(profile["shared_songs"]),
+            total_ratings
         )
 
+        selected_songs = profile["shared_songs"].head(shared_count)
+        remaining_count = total_ratings - len(selected_songs)
 
-        # Give each selected song
-        # a random rating from 1-5
+        if remaining_count > 0:
+            remaining_pool = profile["candidate_songs"][
+                ~profile["candidate_songs"]["track_name"].isin(
+                    selected_songs["track_name"]
+                )
+            ]
+
+            if len(remaining_pool) >= remaining_count:
+                extra_songs = remaining_pool.sample(
+                    remaining_count,
+                    random_state=RANDOM_SEED + user,
+                )
+            else:
+                extra_songs = songs[
+                    ~songs["track_name"].isin(selected_songs["track_name"])
+                ].sample(
+                    remaining_count,
+                    random_state=RANDOM_SEED + user,
+                )
+
+            selected_songs = pd.concat(
+                [selected_songs, extra_songs],
+                ignore_index=True,
+            )
+
+        # Rate favourite-genre and favourite-mood songs higher so
+        # collaborative filtering can learn clear user behaviour patterns.
         for _, song in selected_songs.iterrows():
+            genre_match = song["track_genre"] == profile["genre"]
+            mood_match = song["mood"] == profile["mood"]
+
+            if genre_match and mood_match:
+                rating = 5
+            elif genre_match or mood_match:
+                rating = random.choice([4, 5, 5])
+            else:
+                rating = random.choice([1, 2, 3])
 
             ratings.append({
 
@@ -83,7 +156,9 @@ def generate_user_ratings():
 
                 "genre": song["track_genre"],
 
-                "rating": random.randint(1, 5)
+                "mood": song["mood"],
+
+                "rating": rating
 
             })
 

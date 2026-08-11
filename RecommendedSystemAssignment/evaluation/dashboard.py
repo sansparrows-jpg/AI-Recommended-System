@@ -168,6 +168,8 @@ def get_evaluation_dashboard():
     collaborative_summary = summarize_bucket(collaborative)
     collaborative_summary["rmse"] = rmse
     collaborative_summary["rating_accuracy"] = collaborative_accuracy(rmse)
+    collaborative_summary["match_accuracy"] = collaborative_summary["accuracy"]
+    collaborative_summary["accuracy"] = collaborative_summary["rating_accuracy"]
 
     return {
         "content": summarize_bucket(content),

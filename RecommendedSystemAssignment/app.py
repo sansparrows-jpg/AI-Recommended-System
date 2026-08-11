@@ -53,14 +53,20 @@ def get_user_count():
 def render_top_10(final_results):
     st.subheader("Top 10 recommended songs")
     st.caption(
-        "Final ranking from Content-Based, Collaborative, and Hybrid recommendation modules."
+        "Final ranking generated from the best 3 results in each module, then sorted from highest to lowest score."
     )
 
     if not final_results:
         st.info("No final recommendation available yet.")
         return
 
-    top_10 = pd.DataFrame(final_results).head(10)
+    top_10 = (
+        pd.DataFrame(final_results)
+        .sort_values("final_score", ascending=False)
+        .head(10)
+        .reset_index(drop=True)
+    )
+    top_10["rank"] = top_10.index + 1
     preferred_columns = [
         "rank",
         "track_name",
