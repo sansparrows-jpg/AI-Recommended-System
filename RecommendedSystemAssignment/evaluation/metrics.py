@@ -1,159 +1,117 @@
-# This file contains the evaluation metrics
-# used to measure the performance of the 
-# recommendation system
+# =========================================================
+# RECOMMENDATION SYSTEM EVALUATION METRICS
+# =========================================================
 
-# Metrics:
-# 1. Precision@K
-# 2. Recall@K
-# 3. F1 Score
-# 4. Accuracy@K
+import math
+
+
+# =========================================================
+# PRECISION@K
+# =========================================================
+
 def precision_at_k(recommended, relevant):
     """
-    Precision@K
-
-    Purpose:
-    Measures how many of the recommended songs
-    are actually relevant.
-
-    Formula:
-       Precision = Correct Recommendation
-                   ----------------------
-                   Total Recommended Songs
-
-    Parameters
-    ----------
-    recommended : list 
-        Songs recommended by the recommender system.
-
-    relevant : list
-        Songs that are actually considered relevant
-        (ground truth).
-
-    Returns
-    -------
-    float
-        Precision score between 0 and 1
+    Measures the proportion of recommended
+    songs that are relevant.
     """
-    
-    # If no songs are recommended,
-    # precision is automatically 0.
-    if len(recommended) == 0:
-        return 0
-    
-    # Convert both lists into sets
-    # Sets make it easy to compare common items
-    # and automatically remove duplicate values.
+
+    if not recommended:
+        return 0.0
+
     recommended_set = set(recommended)
     relevant_set = set(relevant)
 
-    # Find songs that appear in both lists
-    # These are the correctly recommended songs.
-    correct = recommended_set.intersection(relevant_set)
+    correct = recommended_set & relevant_set
 
-    # Apply the Precision formula
-    precision = len(correct) / len(recommended)
+    return len(correct) / len(recommended)
 
-    # Round the results to 3 decimal places.
-    return round(precision, 3)
+
+# =========================================================
+# RECALL@K
+# =========================================================
 
 def recall_at_k(recommended, relevant):
     """
-    Recall@K
-
-    Purpose:
-    Measures how many relevant songs
-    were successfully recommended.
-
-    Formula
-        Recall = Correct Recommendations
-                 -----------------------
-                 Total Relevant Songs
-
-    Parameters 
-    ----------
-    recommended : list
-        Songs recommended by the recommender system
-
-    relevant : list
-        Expected relevant songs
-
-    Returns
-    -------
-    float
-        Recall score between 0 and 1.
+    Measures the proportion of relevant
+    songs successfully recommended.
     """
 
-    # Avoid division by zero
-    if len(relevant) == 0:
-        return 0 
-    
-    # Convert lists into sets
+    if not relevant:
+        return 0.0
+
     recommended_set = set(recommended)
     relevant_set = set(relevant)
 
-    # Find common songs
-    correct = recommended_set.intersection(relevant_set)
+    correct = recommended_set & relevant_set
 
-    # Apply Recall formula
-    recall = len(correct) / len(relevant)
+    return len(correct) / len(relevant)
 
-    return round(recall, 3)
+
+# =========================================================
+# F1 SCORE
+# =========================================================
 
 def f1_score(precision, recall):
     """
-    F1 Score
-
-    Purpose:
-    Combines Precision and Recall into 
-    one overall evaluation score.
-
-    Formula:
-            2 x Precision x Recall
-    F1 = ----------------------------
-          Precision + Recall
-
-    Paramets
-    --------
-    precision : float
-
-    recall : float
-
-    Returns
-    -------
-    float
-       F1 socre between 0 and 1.
+    Combines Precision and Recall
+    into one score.
     """
 
-    # If both Precision and Recall are zero,
-    # F1 Score is also zero
     if precision + recall == 0:
-        return 0
-    
-    # Apply the F1 formula
-    f1 = (2 * precision * recall) / (precision + recall)
+        return 0.0
 
-    return round(f1, 3)
+    return (
+        2 * precision * recall
+        /
+        (precision + recall)
+    )
 
 
-def accuracy_at_k(recommended, relevant):
+# =========================================================
+# HIT RATE@K
+# =========================================================
+
+def hit_rate_at_k(recommended, relevant):
     """
-    Accuracy@K
-
-    Measures how much the recommendation set matches
-    the relevant song set.
+    Returns 1 when at least one relevant song
+    appears in the recommendation list.
     """
-
-    if len(recommended) == 0 and len(relevant) == 0:
-        return 1
 
     recommended_set = set(recommended)
     relevant_set = set(relevant)
-    total_unique = recommended_set.union(relevant_set)
 
-    if len(total_unique) == 0:
-        return 0
+    if recommended_set & relevant_set:
+        return 1.0
 
-    correct = recommended_set.intersection(relevant_set)
-    accuracy = len(correct) / len(total_unique)
+    return 0.0
 
-    return round(accuracy, 3)
+
+# =========================================================
+# RMSE
+# =========================================================
+
+def rmse(actual, predicted):
+    """
+    Root Mean Square Error.
+
+    Lower RMSE indicates better
+    rating prediction accuracy.
+    """
+
+    if not actual or not predicted:
+        return None
+
+    if len(actual) != len(predicted):
+        return None
+
+    squared_errors = [
+        (float(actual_value) - float(predicted_value)) ** 2
+        for actual_value, predicted_value
+        in zip(actual, predicted)
+    ]
+
+    return math.sqrt(
+        sum(squared_errors)
+        /
+        len(squared_errors)
+    )

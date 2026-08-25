@@ -56,5 +56,15 @@ def preprocess_data():
         axis=1
     )
 
+    # IMPORTANT:
+    # Reset index after removing rows.
+    # 
+    # This keeps the DataFrame position 
+    # aligned with the TF-IDF and 
+    # audio features matrices
+    songs = songs.reset_index(
+        drop=True
+    )
+
     # Return cleaned dataset
     return songs
