@@ -2,8 +2,9 @@
 #
 # Functions:
 # 1. Login
-# 2. Register new account
-# 3. Automatically generate new User ID
+# 2. Register new user account
+# 3. Generate new User ID
+# 4. Support user and admin roles
 
 
 from pathlib import Path
@@ -31,8 +32,7 @@ def load_users():
     Load registered users from users.csv.
     """
 
-    # If users.csv does not exist,
-    # create an empty file.
+    # Create users.csv if it does not exist.
     if not USERS_PATH.exists():
 
         empty_users = pd.DataFrame(
@@ -40,6 +40,7 @@ def load_users():
                 "user_id",
                 "username",
                 "password",
+                "role",
             ]
         )
 
@@ -57,8 +58,28 @@ def load_users():
     )
 
 
-    # Prevent missing values
+    # Prevent missing values.
     users = users.fillna("")
+
+
+    # Support older users.csv files
+    # that do not contain a role column.
+    if "role" not in users.columns:
+
+        users["role"] = "user"
+
+        users.to_csv(
+            USERS_PATH,
+            index=False
+        )
+
+
+    # If an existing account has
+    # an empty role, treat it as user.
+    users.loc[
+        users["role"].str.strip() == "",
+        "role"
+    ] = "user"
 
 
     return users
@@ -73,12 +94,14 @@ def authenticate(
     password
 ):
     """
-    Check whether username and password
-    match an existing account.
+    Check username and password.
 
-    Returns user information if valid.
+    Returns:
+        user_id
+        username
+        role
 
-    Otherwise returns None.
+    Returns None if login fails.
     """
 
     users = load_users()
@@ -129,13 +152,35 @@ def authenticate(
     user = match.iloc[0]
 
 
-    return {
+    role = (
+        str(
+            user.get(
+                "role",
+                "user"
+            )
+        )
+        .strip()
+        .casefold()
+    )
 
+
+    if role not in [
+        "user",
+        "admin",
+    ]:
+
+        role = "user"
+
+
+    return {
         "user_id":
             user["user_id"],
 
         "username":
             user["username"],
+
+        "role":
+            role,
     }
 
 
@@ -148,7 +193,7 @@ def username_exists(
 ):
     """
     Check whether a username
-    has already been registered.
+    already exists.
     """
 
     users = load_users()
@@ -162,7 +207,6 @@ def username_exists(
 
 
     existing_usernames = (
-
         users["username"]
         .astype(str)
         .str.strip()
@@ -182,21 +226,20 @@ def username_exists(
 
 def generate_user_id():
     """
-    Generate the next User ID.
+    Generate the next normal User ID.
 
-    Existing rating users occupy:
+    Admin IDs are ignored.
 
-    User001 - User100
-
-    Therefore new registered users
-    start from User101.
+    Example:
+        Highest User ID = User107
+        Next User ID = User108
     """
 
     users = load_users()
 
 
-    # Always reserve User001 - User100
-    # for the generated rating dataset.
+    # Existing project user IDs
+    # start from User101 for newer accounts.
     highest_number = 100
 
 
@@ -210,6 +253,8 @@ def generate_user_id():
         )
 
 
+        # Ignore Admin001 and
+        # any other non-User IDs.
         if not user_id.startswith(
             "User"
         ):
@@ -260,13 +305,18 @@ def register_user(
     password
 ):
     """
-    Create a new user account.
+    Create a normal user account.
+
+    Registration can only create
+    role = user.
+
+    Admin accounts must be created
+    manually in users.csv.
 
     Returns:
-
-    success,
-    message,
-    user
+        success
+        message
+        user
     """
 
     username = (
@@ -349,13 +399,12 @@ def register_user(
 
 
     # =====================================================
-    # CREATE NEW USER
+    # CREATE NORMAL USER
     # =====================================================
 
     new_user = pd.DataFrame(
         [
             {
-
                 "user_id":
                     new_user_id,
 
@@ -364,13 +413,16 @@ def register_user(
 
                 "password":
                     password,
+
+                "role":
+                    "user",
             }
         ]
     )
 
 
     # =====================================================
-    # ADD TO USERS FILE
+    # SAVE USER
     # =====================================================
 
     users = pd.concat(
@@ -402,6 +454,9 @@ def register_user(
 
             "username":
                 username,
+
+            "role":
+                "user",
         },
     )
 

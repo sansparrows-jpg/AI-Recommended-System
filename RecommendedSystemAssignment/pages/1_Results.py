@@ -9,9 +9,7 @@ from models.collaborative import (
     MIN_USER_RATINGS,
 )
 
-from models.ratings import (
-    get_rating_count,
-)
+from models.ratings import get_rating_count
 
 
 # =========================================================
@@ -26,118 +24,65 @@ st.set_page_config(
 
 
 # =========================================================
-# LOGIN CHECK
+# ADMIN ACCESS CHECK
 # =========================================================
 
-if not st.session_state.get(
-    "logged_in",
-    False
-):
+if not st.session_state.get("logged_in", False):
+    st.warning("Please login first.")
+    st.stop()
 
-    st.warning(
-        "Please login first."
-    )
-
-    st.page_link(
-        "app.py",
-        label="Go to Login"
-    )
-
+if st.session_state.get("role") != "admin":
+    st.error("Access denied. Admin only.")
     st.stop()
 
 
 # =========================================================
-# TABLE FUNCTION
+# TABLE FUNCTIONS
 # =========================================================
 
-def show_table(
-    rows,
-    columns=None
-):
-
+def show_table(rows, columns=None):
     if not rows:
-
-        st.info(
-            "No recommendations available."
-        )
-
+        st.info("No recommendations available.")
         return
 
-
-    df = (
-        pd.DataFrame(
-            rows
-        )
-    )
-
+    df = pd.DataFrame(rows)
 
     if columns:
-
         visible_columns = [
-
             column
-
             for column in columns
-
             if column in df.columns
         ]
 
-
-        df = df[
-            visible_columns
-        ]
-
+        df = df[visible_columns]
 
     st.dataframe(
         df,
         width="stretch",
-        hide_index=True
+        hide_index=True,
     )
 
 
-# =========================================================
-# FINAL TABLE
-# =========================================================
-
-def show_final_table(
-    rows
-):
-
+def show_final_table(rows):
     if not rows:
-
-        st.info(
-            "No recommendations available."
-        )
-
+        st.info("No recommendations available.")
         return
 
+    df = pd.DataFrame(rows)
+
+    if "final_score" in df.columns:
+        df = df.sort_values(
+            "final_score",
+            ascending=False,
+        )
 
     df = (
-        pd.DataFrame(
-            rows
-        )
-
-        .sort_values(
-            "final_score",
-            ascending=False
-        )
-
+        df
         .head(10)
-
-        .reset_index(
-            drop=True
-        )
+        .reset_index(drop=True)
     )
 
-
-    df[
-        "rank"
-    ] = (
-        df.index
-        +
-        1
-    )
-
+    df["rank"] = df.index + 1
 
     columns = [
         "rank",
@@ -149,187 +94,133 @@ def show_final_table(
         "final_score",
     ]
 
-
     visible_columns = [
-
         column
-
         for column in columns
-
         if column in df.columns
     ]
 
-
     st.dataframe(
-        df[
-            visible_columns
-        ],
+        df[visible_columns],
         width="stretch",
-        hide_index=True
+        hide_index=True,
     )
 
 
 # =========================================================
-# DETERMINE COLLABORATIVE SOURCE
+# COLLABORATIVE HELPERS
 # =========================================================
 
-def get_recommendation_source(
-    song
-):
+def get_recommendation_source(song):
     """
-    Determine whether the recommendation
-    is supported by User-Based KNN,
-    Item-Based KNN, or both.
+    Determine whether a recommendation was supported by
+    User-Based KNN, Item-Based KNN, or both.
     """
 
     user_score = float(
         song.get(
             "user_knn_score",
-            0
+            0,
         )
         or 0
     )
-
 
     item_score = float(
         song.get(
             "item_knn_score",
-            0
+            0,
         )
         or 0
     )
 
-
-    if (
-        user_score > 0
-        and
-        item_score > 0
-    ):
-
+    if user_score > 0 and item_score > 0:
         return "Both"
 
-
     if user_score > 0:
-
         return "User-Based"
 
-
     if item_score > 0:
-
         return "Item-Based"
-
 
     return "None"
 
 
-# =========================================================
-# PREPARE COLLABORATIVE TABLE
-# =========================================================
-
-def prepare_collaborative_results(
-    rows
-):
-
+def prepare_collaborative_results(rows):
     prepared = []
 
-
     for song in rows:
+        row = song.copy()
 
-        row = (
-            song.copy()
+        row["source"] = get_recommendation_source(
+            song
         )
 
-
-        row[
-            "source"
-        ] = (
-            get_recommendation_source(
-                song
-            )
-        )
-
-
-        prepared.append(
-            row
-        )
-
+        prepared.append(row)
 
     return prepared
 
 
 # =========================================================
-# GET SESSION RESULTS
+# GET LATEST USER RECOMMENDATION SNAPSHOT
 # =========================================================
 
-if (
-    "content_results"
-    not in st.session_state
-):
+admin_review = st.session_state.get(
+    "admin_review"
+)
 
+if not admin_review:
     st.warning(
-        "No recommendation has been generated yet."
+        "No user recommendation is available for review yet."
     )
 
     st.info(
-        "Return to the Discover page "
-        "and select a song first."
-    )
-
-    st.page_link(
-        "app.py",
-        label="Go to Discover"
+        "Ask a normal user to search and generate "
+        "recommendations first. The latest user "
+        "recommendation will remain temporarily available "
+        "for Admin after the user logs out."
     )
 
     st.stop()
 
 
-selected_song = (
-    st.session_state.get(
-        "selected_song",
-        ""
-    )
+selected_song = admin_review.get(
+    "selected_song",
+    "",
 )
 
-selected_artist = (
-    st.session_state.get(
-        "selected_artist",
-        ""
-    )
+selected_artist = admin_review.get(
+    "selected_artist",
+    "",
 )
 
-selected_user = (
-    st.session_state.get(
-        "selected_user",
-        ""
-    )
+selected_user = admin_review.get(
+    "user_id",
+    "",
 )
 
-content_results = (
-    st.session_state.get(
-        "content_results",
-        []
-    )
+selected_username = admin_review.get(
+    "username",
+    "",
 )
 
-collaborative_results = (
-    st.session_state.get(
-        "collaborative_results",
-        []
-    )
+content_results = admin_review.get(
+    "content_results",
+    [],
 )
 
-hybrid_results = (
-    st.session_state.get(
-        "hybrid_results",
-        []
-    )
+collaborative_results = admin_review.get(
+    "collaborative_results",
+    [],
 )
 
-final_results = (
-    st.session_state.get(
-        "final_results",
-        []
-    )
+hybrid_results = admin_review.get(
+    "hybrid_results",
+    [],
+)
+
+final_results = admin_review.get(
+    "final_results",
+    [],
 )
 
 
@@ -337,10 +228,8 @@ final_results = (
 # USER RATING COUNT
 # =========================================================
 
-rating_count = (
-    get_rating_count(
-        selected_user
-    )
+rating_count = get_rating_count(
+    selected_user
 )
 
 
@@ -349,141 +238,121 @@ rating_count = (
 # =========================================================
 
 st.title(
-    "Recommendation results",
-    anchor=False
+    "Admin Recommendation Review",
+    anchor=False,
 )
 
 st.caption(
-    "View the final recommendations and "
-    "understand how each recommendation "
-    "model generated its results."
+    "Review the latest recommendation generated by "
+    "a normal user and inspect the three "
+    "recommendation modules."
+)
+
+st.info(
+    "This is a temporary review snapshot. "
+    "Recommendation results are not saved to the dataset."
 )
 
 
 # =========================================================
-# INPUT + SUMMARY
+# RECOMMENDATION INFORMATION
 # =========================================================
 
-with st.container(
-    border=True
-):
+with st.container(border=True):
 
     st.subheader(
         "Recommendation information"
     )
 
-
-    # =====================================================
-    # INPUT INFORMATION
-    # =====================================================
-
-    input_col1, input_col2, input_col3 = (
+    input_col1, input_col2, input_col3, input_col4 = (
         st.columns(
             [
                 2,
                 2,
-                1
+                1,
+                1,
             ]
         )
     )
 
-
     with input_col1:
-
         st.metric(
             "Selected song",
-            selected_song
+            selected_song,
         )
-
 
     with input_col2:
-
         st.metric(
             "Artist",
-            selected_artist
-            or
-            "Unknown"
+            selected_artist or "Unknown",
         )
-
 
     with input_col3:
-
         st.metric(
             "User ID",
-            selected_user
+            selected_user,
         )
 
+    with input_col4:
+        st.metric(
+            "Username",
+            selected_username or "Unknown",
+        )
 
     st.divider()
-
-
-    # =====================================================
-    # SUMMARY
-    # =====================================================
 
     summary_col1, summary_col2, summary_col3, summary_col4 = (
         st.columns(4)
     )
 
-
     with summary_col1:
-
         st.metric(
             "Content-Based",
-            len(
-                content_results
-            )
+            len(content_results),
         )
-
 
     with summary_col2:
-
         st.metric(
             "Collaborative",
-            len(
-                collaborative_results
-            )
+            len(collaborative_results),
         )
-
 
     with summary_col3:
-
         st.metric(
             "Hybrid",
-            len(
-                hybrid_results
-            )
+            len(hybrid_results),
         )
 
-
     with summary_col4:
-
         st.metric(
             "User Ratings",
-            rating_count
+            rating_count,
         )
 
 
 # =========================================================
-# MAIN NAVIGATION TABS
+# MAIN TABS
 # =========================================================
 
 st.markdown("")
 
-overview_tab, content_tab, collaborative_tab, hybrid_tab = (
-    st.tabs(
-        [
-            "Overview",
-            "Content-Based",
-            "Collaborative",
-            "Hybrid",
-        ]
-    )
+(
+    overview_tab,
+    content_tab,
+    collaborative_tab,
+    hybrid_tab,
+) = st.tabs(
+    [
+        "Overview",
+        "Content-Based",
+        "Collaborative",
+        "Hybrid",
+    ]
 )
 
 
 # =========================================================
-# OVERVIEW TAB
+# OVERVIEW
 # =========================================================
 
 with overview_tab:
@@ -492,19 +361,13 @@ with overview_tab:
         "Final Top 10 recommended songs"
     )
 
-
-    if (
-        rating_count
-        >=
-        MIN_USER_RATINGS
-    ):
+    if rating_count >= MIN_USER_RATINGS:
 
         st.info(
             "Personalised Hybrid mode is active. "
             "The Hybrid model uses 40% Content-Based "
             "and 60% Collaborative weighting."
         )
-
 
     else:
 
@@ -515,14 +378,13 @@ with overview_tab:
             "Content-Based recommendations."
         )
 
-
     show_final_table(
         final_results
     )
 
 
 # =========================================================
-# CONTENT-BASED TAB
+# CONTENT-BASED
 # =========================================================
 
 with content_tab:
@@ -531,13 +393,11 @@ with content_tab:
         "Content-Based Filtering"
     )
 
-
     st.caption(
         "Recommends songs based on the selected "
         "song's metadata and audio features using "
         "Cosine Similarity."
     )
-
 
     show_table(
         content_results,
@@ -548,12 +408,12 @@ with content_tab:
             "mood",
             "popularity",
             "similarity",
-        ]
+        ],
     )
 
 
 # =========================================================
-# COLLABORATIVE TAB
+# COLLABORATIVE
 # =========================================================
 
 with collaborative_tab:
@@ -562,30 +422,21 @@ with collaborative_tab:
         "Collaborative Filtering"
     )
 
-
     st.caption(
         "Uses User-Based KNN and Item-Based KNN "
         "with Euclidean Distance."
     )
 
-
-    # =====================================================
+    # -----------------------------------------------------
     # COLD START
-    # =====================================================
+    # -----------------------------------------------------
 
-    if (
-        rating_count
-        <
-        MIN_USER_RATINGS
-    ):
+    if rating_count < MIN_USER_RATINGS:
 
         remaining = (
-
             MIN_USER_RATINGS
-            -
-            rating_count
+            - rating_count
         )
-
 
         st.warning(
             f"{selected_user} currently has "
@@ -594,30 +445,29 @@ with collaborative_tab:
             f"least {MIN_USER_RATINGS} ratings."
         )
 
-
         st.info(
             f"{remaining} more rating(s) are needed "
             f"before User-Based and Item-Based KNN "
             f"can be used."
         )
 
-
-    # =====================================================
+    # -----------------------------------------------------
     # COLLABORATIVE AVAILABLE
-    # =====================================================
+    # -----------------------------------------------------
 
     else:
 
-        recommendation_tab, users_tab, explanation_tab = (
-            st.tabs(
-                [
-                    "Recommendations",
-                    "Similar Users",
-                    "Why This Song?",
-                ]
-            )
+        (
+            recommendation_tab,
+            users_tab,
+            explanation_tab,
+        ) = st.tabs(
+            [
+                "Recommendations",
+                "Similar Users",
+                "Why This Song?",
+            ]
         )
-
 
         # =================================================
         # RECOMMENDATIONS
@@ -629,20 +479,17 @@ with collaborative_tab:
                 "### Collaborative Top 10"
             )
 
-
             st.caption(
-                "The Source column shows whether "
-                "each recommendation is supported by "
+                "The Source column shows whether each "
+                "recommendation is supported by "
                 "User-Based KNN, Item-Based KNN, or both."
             )
-
 
             prepared_collaborative = (
                 prepare_collaborative_results(
                     collaborative_results
                 )
             )
-
 
             show_table(
                 prepared_collaborative,
@@ -656,9 +503,8 @@ with collaborative_tab:
                     "user_knn_score",
                     "item_knn_score",
                     "collaborative_score",
-                ]
+                ],
             )
-
 
             st.info(
                 "Both = supported by User-Based KNN "
@@ -666,7 +512,6 @@ with collaborative_tab:
                 "User-Based = supported by similar users. "
                 "Item-Based = supported by similar songs."
             )
-
 
         # =================================================
         # SIMILAR USERS
@@ -678,19 +523,14 @@ with collaborative_tab:
                 f"### Users similar to {selected_user}"
             )
 
-
             st.caption(
                 "Smaller Euclidean Distance means "
                 "the rating behaviour is more similar."
             )
 
-
-            neighbours = (
-                find_nearest_users(
-                    selected_user
-                )
+            neighbours = find_nearest_users(
+                selected_user
             )
-
 
             if not neighbours:
 
@@ -698,67 +538,51 @@ with collaborative_tab:
                     "No similar users were found."
                 )
 
-
             else:
 
                 neighbour_rows = []
 
-
                 for rank, neighbour in enumerate(
                     neighbours,
-                    start=1
+                    start=1,
                 ):
 
                     neighbour_rows.append(
                         {
-
                             "rank":
                                 rank,
 
                             "user_id":
-                                neighbour[
-                                    "user_id"
-                                ],
+                                neighbour["user_id"],
 
                             "distance":
                                 round(
-                                    neighbour[
-                                        "distance"
-                                    ],
-                                    3
+                                    neighbour["distance"],
+                                    3,
                                 ),
 
                             "similarity":
                                 round(
-                                    neighbour[
-                                        "similarity"
-                                    ],
-                                    3
+                                    neighbour["similarity"],
+                                    3,
                                 ),
 
                             "common_ratings":
-                                neighbour[
-                                    "common_ratings"
-                                ],
+                                neighbour["common_ratings"],
                         }
                     )
-
 
                 st.dataframe(
                     pd.DataFrame(
                         neighbour_rows
                     ),
                     width="stretch",
-                    hide_index=True
+                    hide_index=True,
                 )
-
 
                 closest_user = (
-                    neighbours[0][
-                        "user_id"
-                    ]
+                    neighbours[0]["user_id"]
                 )
-
 
                 st.success(
                     f"The most similar user to "
@@ -766,40 +590,24 @@ with collaborative_tab:
                     f"{closest_user}."
                 )
 
-
-                # =========================================
-                # USER SELECTION
-                # =========================================
-
                 neighbour_ids = [
-
-                    neighbour[
-                        "user_id"
-                    ]
-
-                    for neighbour
-                    in neighbours
+                    neighbour["user_id"]
+                    for neighbour in neighbours
                 ]
 
-
-                selected_neighbour = (
-                    st.selectbox(
-                        "Compare rating behaviour with",
-                        neighbour_ids,
-                        key="similar_user_comparison"
-                    )
+                selected_neighbour = st.selectbox(
+                    "Compare rating behaviour with",
+                    neighbour_ids,
+                    key=(
+                        f"similar_user_comparison_"
+                        f"{selected_user}"
+                    ),
                 )
 
-
-                details = (
-                    get_user_similarity_details(
-
-                        selected_user,
-
-                        selected_neighbour
-                    )
+                details = get_user_similarity_details(
+                    selected_user,
+                    selected_neighbour,
                 )
-
 
                 if details:
 
@@ -808,92 +616,70 @@ with collaborative_tab:
                         f"{selected_neighbour}"
                     )
 
-
                     metric1, metric2, metric3 = (
                         st.columns(3)
                     )
 
-
                     with metric1:
-
                         st.metric(
                             "Euclidean Distance",
-                            f"{details['distance']:.3f}"
+                            f"{details['distance']:.3f}",
                         )
-
 
                     with metric2:
-
                         st.metric(
                             "Similarity Score",
-                            f"{details['similarity']:.3f}"
+                            f"{details['similarity']:.3f}",
                         )
-
 
                     with metric3:
-
                         st.metric(
                             "Common Ratings",
-                            details[
-                                "common_ratings"
-                            ]
+                            details["common_ratings"],
                         )
-
 
                     metric4, metric5, metric6 = (
                         st.columns(3)
                     )
 
-
                     with metric4:
-
                         st.metric(
                             "Exact Same Ratings",
-                            details[
-                                "exact_matches"
-                            ]
+                            details["exact_matches"],
                         )
-
 
                     with metric5:
-
                         st.metric(
                             "Within 1 Point",
-                            details[
-                                "close_matches"
-                            ]
+                            details["close_matches"],
                         )
-
 
                     with metric6:
-
                         st.metric(
                             "Average Difference",
-                            f"{details['average_difference']:.2f}"
+                            (
+                                f"{details['average_difference']:.2f}"
+                            ),
                         )
-
 
                     st.info(
                         f"{selected_user} and "
                         f"{selected_neighbour} rated "
-                        f"{details['common_ratings']} "
-                        f"same songs. "
+                        f"{details['common_ratings']} same songs. "
                         f"They gave exactly the same rating "
                         f"for {details['exact_matches']} songs."
                     )
 
-
-                    # =====================================
-                    # COLLAPSED DETAILED TABLE
-                    # =====================================
+                    # -------------------------------------
+                    # COMMON RATING COMPARISON
+                    # -------------------------------------
 
                     with st.expander(
                         "View common rating comparison",
-                        expanded=False
+                        expanded=False,
                     ):
 
                         comparison_rows = []
-
 
                         for row in details[
                             "comparison"
@@ -901,21 +687,14 @@ with collaborative_tab:
 
                             comparison_rows.append(
                                 {
-
                                     "track_name":
-                                        row[
-                                            "track_name"
-                                        ],
+                                        row["track_name"],
 
                                     "artist":
-                                        row[
-                                            "artist"
-                                        ],
+                                        row["artist"],
 
                                     selected_user:
-                                        row[
-                                            "target_rating"
-                                        ],
+                                        row["target_rating"],
 
                                     selected_neighbour:
                                         row[
@@ -923,9 +702,7 @@ with collaborative_tab:
                                         ],
 
                                     "difference":
-                                        row[
-                                            "difference"
-                                        ],
+                                        row["difference"],
 
                                     "difference_squared":
                                         row[
@@ -934,39 +711,29 @@ with collaborative_tab:
                                 }
                             )
 
-
-                        comparison_df = (
-                            pd.DataFrame(
-                                comparison_rows
-                            )
+                        comparison_df = pd.DataFrame(
+                            comparison_rows
                         )
-
 
                         st.dataframe(
                             comparison_df,
                             width="stretch",
-                            hide_index=True
+                            hide_index=True,
                         )
 
-
                         squared_total = (
-
                             comparison_df[
                                 "difference_squared"
                             ].sum()
-
                             if not comparison_df.empty
-
                             else 0
                         )
-
 
                         st.caption(
                             f"Euclidean Distance = "
                             f"√({squared_total}) "
                             f"= {details['distance']:.3f}"
                         )
-
 
         # =================================================
         # WHY THIS SONG?
@@ -978,13 +745,11 @@ with collaborative_tab:
                 "### Why was this song recommended?"
             )
 
-
             st.caption(
                 "Choose a recommended song to see "
                 "how User-Based and Item-Based KNN "
                 "contributed to it."
             )
-
 
             if not collaborative_results:
 
@@ -993,91 +758,83 @@ with collaborative_tab:
                     "are available."
                 )
 
-
             else:
 
-                # =========================================
-                # SONG OPTIONS
-                # =========================================
-
                 song_options = {
-
                     (
                         f"{song['track_name']} "
                         f"— {song['artist']}"
                     ):
                         song
 
-                    for song
-                    in collaborative_results
+                    for song in collaborative_results
                 }
 
-
-                selected_label = (
-                    st.selectbox(
-                        "Select recommended song",
-                        list(
-                            song_options.keys()
-                        ),
-                        key="collaborative_explanation_song"
-                    )
+                selected_label = st.selectbox(
+                    "Select recommended song",
+                    list(
+                        song_options.keys()
+                    ),
+                    key=(
+                        f"collaborative_explanation_song_"
+                        f"{selected_user}"
+                    ),
                 )
-
 
                 recommendation_song = (
-                    song_options[
-                        selected_label
-                    ]
+                    song_options[selected_label]
                 )
 
-
-                source = (
-                    get_recommendation_source(
-                        recommendation_song
-                    )
+                source = get_recommendation_source(
+                    recommendation_song
                 )
 
-
-                # =========================================
-                # SCORE SUMMARY
-                # =========================================
+                # -----------------------------------------
+                # SCORES
+                # -----------------------------------------
 
                 score1, score2, score3, score4 = (
                     st.columns(4)
                 )
 
-
                 with score1:
-
                     st.metric(
                         "Source",
-                        source
+                        source,
                     )
-
 
                 with score2:
-
                     st.metric(
                         "User-Based KNN",
-                        f"{recommendation_song.get('user_knn_score', 0):.3f}"
+                        (
+                            f"{recommendation_song.get(
+                                'user_knn_score',
+                                0
+                            ):.3f}"
+                        ),
                     )
-
 
                 with score3:
-
                     st.metric(
                         "Item-Based KNN",
-                        f"{recommendation_song.get('item_knn_score', 0):.3f}"
+                        (
+                            f"{recommendation_song.get(
+                                'item_knn_score',
+                                0
+                            ):.3f}"
+                        ),
                     )
-
 
                 with score4:
-
                     st.metric(
                         "Collaborative Score",
-                        f"{recommendation_song.get('collaborative_score', 0):.3f}"
+                        (
+                            f"{recommendation_song.get(
+                                'collaborative_score',
+                                0
+                            ):.3f}"
+                        ),
                     )
-
 
                 st.caption(
                     "Collaborative Score = "
@@ -1085,36 +842,29 @@ with collaborative_tab:
                     "50% Item-Based KNN."
                 )
 
-
-                # =========================================
-                # REASON TABS
-                # =========================================
-
-                user_reason_tab, item_reason_tab = (
-                    st.tabs(
-                        [
-                            "User-Based Reason",
-                            "Item-Based Reason",
-                        ]
-                    )
+                (
+                    user_reason_tab,
+                    item_reason_tab,
+                ) = st.tabs(
+                    [
+                        "User-Based Reason",
+                        "Item-Based Reason",
+                    ]
                 )
 
-
                 # =========================================
-                # USER-BASED EXPLANATION
+                # USER-BASED REASON
                 # =========================================
 
                 with user_reason_tab:
 
                     user_score = float(
-
                         recommendation_song.get(
                             "user_knn_score",
-                            0
+                            0,
                         )
                         or 0
                     )
-
 
                     if user_score <= 0:
 
@@ -1123,24 +873,19 @@ with collaborative_tab:
                             "by User-Based KNN."
                         )
 
-
                     else:
 
                         support = (
                             get_recommendation_support(
-
                                 selected_user,
-
                                 recommendation_song[
                                     "track_name"
                                 ],
-
                                 recommendation_song[
                                     "artist"
-                                ]
+                                ],
                             )
                         )
-
 
                         if support:
 
@@ -1153,24 +898,20 @@ with collaborative_tab:
                                     f"rated this song before."
                                 )
 
-
                             liked_supporters = (
                                 support[
                                     "liked_supporters"
                                 ]
                             )
 
-
                             if liked_supporters:
 
                                 supporter_rows = []
-
 
                                 for supporter in liked_supporters:
 
                                     supporter_rows.append(
                                         {
-
                                             "similar_user":
                                                 supporter[
                                                     "user_id"
@@ -1181,7 +922,7 @@ with collaborative_tab:
                                                     supporter[
                                                         "similarity"
                                                     ],
-                                                    3
+                                                    3,
                                                 ),
 
                                             "distance":
@@ -1189,7 +930,7 @@ with collaborative_tab:
                                                     supporter[
                                                         "distance"
                                                     ],
-                                                    3
+                                                    3,
                                                 ),
 
                                             "rating":
@@ -1199,44 +940,35 @@ with collaborative_tab:
                                         }
                                     )
 
-
                                 st.success(
                                     f"{len(liked_supporters)} "
                                     f"similar user(s) rated this "
                                     f"song 4 or 5."
                                 )
 
-
                                 st.dataframe(
                                     pd.DataFrame(
                                         supporter_rows
                                     ),
                                     width="stretch",
-                                    hide_index=True
+                                    hide_index=True,
                                 )
-
 
                                 strongest = max(
-
                                     liked_supporters,
-
                                     key=lambda user:
-                                        user[
-                                            "similarity"
-                                        ]
+                                        user["similarity"],
                                 )
 
-
                                 st.caption(
-                                    f"Strongest User-Based support: "
+                                    "Strongest User-Based support: "
                                     f"{strongest['user_id']} "
-                                    f"rated this song "
+                                    "rated this song "
                                     f"{strongest['rating']}/5 "
-                                    f"and has similarity "
+                                    "and has similarity "
                                     f"{strongest['similarity']:.3f} "
                                     f"with {selected_user}."
                                 )
-
 
                             else:
 
@@ -1245,22 +977,19 @@ with collaborative_tab:
                                     "this song 4 or 5."
                                 )
 
-
-                # =========================================
-                # ITEM-BASED EXPLANATION
-                # =========================================
+        # =================================================
+        # ITEM-BASED REASON
+        # =================================================
 
                 with item_reason_tab:
 
                     item_score = float(
-
                         recommendation_song.get(
                             "item_knn_score",
-                            0
+                            0,
                         )
                         or 0
                     )
-
 
                     if item_score <= 0:
 
@@ -1269,29 +998,23 @@ with collaborative_tab:
                             "by Item-Based KNN."
                         )
 
-
                     else:
 
                         item_support = (
                             get_item_recommendation_support(
-
                                 selected_user,
-
                                 recommendation_song[
                                     "track_name"
                                 ],
-
                                 recommendation_song[
                                     "artist"
-                                ]
+                                ],
                             )
                         )
 
-
                         if (
                             item_support
-                            and
-                            item_support[
+                            and item_support[
                                 "supporting_items"
                             ]
                         ):
@@ -1303,9 +1026,7 @@ with collaborative_tab:
                                 "rated 4 or 5."
                             )
 
-
                             item_rows = []
-
 
                             for item in item_support[
                                 "supporting_items"
@@ -1313,7 +1034,6 @@ with collaborative_tab:
 
                                 item_rows.append(
                                     {
-
                                         "liked_song":
                                             item[
                                                 "track_name"
@@ -1334,7 +1054,7 @@ with collaborative_tab:
                                                 item[
                                                     "distance"
                                                 ],
-                                                3
+                                                3,
                                             ),
 
                                         "similarity":
@@ -1342,7 +1062,7 @@ with collaborative_tab:
                                                 item[
                                                     "similarity"
                                                 ],
-                                                3
+                                                3,
                                             ),
 
                                         "common_users":
@@ -1352,36 +1072,31 @@ with collaborative_tab:
                                     }
                                 )
 
-
                             st.dataframe(
                                 pd.DataFrame(
                                     item_rows
                                 ),
                                 width="stretch",
-                                hide_index=True
+                                hide_index=True,
                             )
 
-
                             strongest_item = (
-
                                 item_support[
                                     "supporting_items"
                                 ][0]
                             )
 
-
                             st.caption(
-                                f"Strongest Item-Based support: "
+                                "Strongest Item-Based support: "
                                 f"{recommendation_song['track_name']} "
-                                f"is most similar to "
+                                "is most similar to "
                                 f"{strongest_item['track_name']} "
-                                f"with similarity "
+                                "with similarity "
                                 f"{strongest_item['similarity']:.3f}. "
                                 f"{selected_user} rated "
                                 f"{strongest_item['track_name']} "
                                 f"{strongest_item['user_rating']}/5."
                             )
-
 
                         else:
 
@@ -1392,7 +1107,7 @@ with collaborative_tab:
 
 
 # =========================================================
-# HYBRID TAB
+# HYBRID
 # =========================================================
 
 with hybrid_tab:
@@ -1401,33 +1116,23 @@ with hybrid_tab:
         "Hybrid Recommendation"
     )
 
-
-    if (
-        rating_count
-        >=
-        MIN_USER_RATINGS
-    ):
+    if rating_count >= MIN_USER_RATINGS:
 
         weight1, weight2 = (
             st.columns(2)
         )
 
-
         with weight1:
-
             st.metric(
                 "Content-Based Weight",
-                "40%"
+                "40%",
             )
-
 
         with weight2:
-
             st.metric(
                 "Collaborative Weight",
-                "60%"
+                "60%",
             )
-
 
         st.caption(
             "Hybrid Score = "
@@ -1435,14 +1140,12 @@ with hybrid_tab:
             "60% Collaborative score."
         )
 
-
     else:
 
         st.info(
             "Cold-start mode: Hybrid currently "
             "uses Content-Based recommendations only."
         )
-
 
     show_table(
         hybrid_results,
@@ -1455,5 +1158,5 @@ with hybrid_tab:
             "content_score",
             "collaborative_score",
             "score",
-        ]
+        ],
     )
