@@ -1,7 +1,9 @@
 # =========================================================
 # SOUND SCOPE
-# REAL USER RATING COLLECTION PAGE
+# ADMIN USER RATING MANAGEMENT PAGE
 # =========================================================
+
+from pathlib import Path
 
 import pandas as pd
 import streamlit as st
@@ -44,20 +46,51 @@ if not st.session_state.get(
 
 
 # =========================================================
-# CURRENT USER
+# CURRENT LOGGED-IN ACCOUNT
 # =========================================================
 
 current_user_id = (
-    st.session_state[
-        "user_id"
-    ]
+    st.session_state.get(
+        "user_id",
+        ""
+    )
 )
 
 current_username = (
-    st.session_state[
-        "username"
-    ]
+    st.session_state.get(
+        "username",
+        ""
+    )
 )
+
+current_role = (
+    str(
+        st.session_state.get(
+            "role",
+            ""
+        )
+    )
+    .strip()
+)
+
+
+# =========================================================
+# ADMIN ACCESS ONLY
+# =========================================================
+
+if (
+    current_role.casefold()
+    !=
+    "admin"
+):
+
+    st.error(
+        "Access denied. "
+        "Only administrators can manage "
+        "Collaborative Filtering ratings."
+    )
+
+    st.stop()
 
 
 # =========================================================
@@ -66,12 +99,20 @@ current_username = (
 
 MINIMUM_RATINGS = 10
 
+USER_RATINGS_FILE = (
+    Path("data/user_ratings.csv")
+)
+
+USERS_FILE = (
+    Path("data/users.csv")
+)
+
 
 # =========================================================
 # COMMON SONGS
 #
-# Every tester should try to rate these songs.
-# This creates overlapping ratings for KNN.
+# Every selected user should have ratings for these songs.
+# This creates overlapping rating data for KNN.
 # =========================================================
 
 COMMON_RATING_TARGETS = [
@@ -126,6 +167,173 @@ COMMON_RATING_TARGETS = [
         "Justin Bieber"
     ),
 ]
+
+
+# =========================================================
+# LOAD AVAILABLE USERS
+# =========================================================
+
+def load_available_users():
+    """
+    Load users that the administrator can manage.
+
+    First try to get users from data/users.csv.
+
+    If data/users.csv is not available,
+    user IDs are loaded from data/user_ratings.csv.
+    """
+
+    user_ids = set()
+
+
+    # =====================================================
+    # TRY USERS FILE
+    # =====================================================
+
+    if USERS_FILE.exists():
+
+        try:
+
+            users_dataframe = (
+                pd.read_csv(
+                    USERS_FILE
+                )
+            )
+
+
+            if (
+                "user_id"
+                in users_dataframe.columns
+            ):
+
+                # =========================================
+                # EXCLUDE ADMIN ACCOUNTS IF ROLE EXISTS
+                # =========================================
+
+                if (
+                    "role"
+                    in users_dataframe.columns
+                ):
+
+                    normal_users = (
+
+                        users_dataframe[
+
+                            users_dataframe[
+                                "role"
+                            ]
+
+                            .astype(str)
+
+                            .str.strip()
+
+                            .str.casefold()
+
+                            !=
+                            "admin"
+                        ]
+                    )
+
+
+                else:
+
+                    normal_users = (
+                        users_dataframe
+                    )
+
+
+                for user_id in (
+                    normal_users[
+                        "user_id"
+                    ]
+                    .dropna()
+                    .astype(str)
+                    .str.strip()
+                ):
+
+                    if user_id:
+
+                        user_ids.add(
+                            user_id
+                        )
+
+
+        except Exception:
+
+            pass
+
+
+    # =====================================================
+    # LOAD USERS FROM RATING DATA
+    # =====================================================
+
+    if USER_RATINGS_FILE.exists():
+
+        try:
+
+            ratings_dataframe = (
+                pd.read_csv(
+                    USER_RATINGS_FILE
+                )
+            )
+
+
+            if (
+                "user_id"
+                in ratings_dataframe.columns
+            ):
+
+                for user_id in (
+                    ratings_dataframe[
+                        "user_id"
+                    ]
+                    .dropna()
+                    .astype(str)
+                    .str.strip()
+                ):
+
+                    if user_id:
+
+                        user_ids.add(
+                            user_id
+                        )
+
+
+        except Exception:
+
+            pass
+
+
+    # =====================================================
+    # REMOVE CURRENT ADMIN FROM LIST
+    # =====================================================
+
+    user_ids = [
+
+        user_id
+
+        for user_id
+        in user_ids
+
+        if (
+            user_id.casefold()
+            !=
+            str(
+                current_user_id
+            )
+            .strip()
+            .casefold()
+        )
+    ]
+
+
+    # =====================================================
+    # SORT USER IDS
+    # =====================================================
+
+    return sorted(
+        user_ids
+    )
 
 
 # =========================================================
@@ -297,13 +505,66 @@ st.title(
 st.caption(
     f"Logged in as "
     f"{current_username} "
-    f"({current_user_id})"
+    f"({current_role})"
 )
 
 
 st.write(
-    "Rate songs from **1 to 5** to build "
-    "your personal music preference profile."
+    "Select a user and manage their song ratings "
+    "from **1 to 5**. These ratings are used to "
+    "build user preference profiles for "
+    "**Collaborative Filtering**."
+)
+
+
+# =========================================================
+# LOAD USERS
+# =========================================================
+
+available_users = (
+    load_available_users()
+)
+
+
+# =========================================================
+# NO USERS FOUND
+# =========================================================
+
+if not available_users:
+
+    st.warning(
+        "No users were found. "
+        "Please make sure user accounts or "
+        "user rating records are available."
+    )
+
+    st.stop()
+
+
+# =========================================================
+# SELECT USER
+# =========================================================
+
+st.subheader(
+    "Manage user ratings"
+)
+
+
+selected_user_id = (
+    st.selectbox(
+
+        "Select user",
+
+        options=available_users,
+
+        key="admin_rating_selected_user",
+    )
+)
+
+
+st.info(
+    f"You are currently managing ratings for "
+    f"**{selected_user_id}**."
 )
 
 
@@ -332,12 +593,12 @@ with st.container(
 
 
 # =========================================================
-# PROFILE PROGRESS
+# SELECTED USER PROFILE PROGRESS
 # =========================================================
 
 rating_count = (
     get_rating_count(
-        current_user_id
+        selected_user_id
     )
 )
 
@@ -352,7 +613,7 @@ progress_value = min(
 
 
 st.subheader(
-    "Your preference profile"
+    f"{selected_user_id}'s preference profile"
 )
 
 
@@ -374,9 +635,9 @@ if (
 ):
 
     st.success(
-        "You have collected enough ratings "
-        "to begin building your Collaborative "
-        "Filtering profile."
+        f"{selected_user_id} has enough ratings "
+        f"to build a Collaborative Filtering "
+        f"profile."
     )
 
 
@@ -392,8 +653,8 @@ else:
     st.info(
         f"Rate {ratings_remaining} more "
         f"{'song' if ratings_remaining == 1 else 'songs'} "
-        f"to reach the minimum Collaborative "
-        f"Filtering profile."
+        f"for {selected_user_id} to reach the minimum "
+        f"Collaborative Filtering profile."
     )
 
 
@@ -410,9 +671,9 @@ st.subheader(
 
 
 st.caption(
-    "These songs are shown to every tester. "
-    "Rating common songs gives KNN enough "
-    "overlapping data to compare users."
+    "These common songs create overlapping rating "
+    "data between users so that KNN Collaborative "
+    "Filtering can compare their preferences."
 )
 
 
@@ -470,13 +731,13 @@ else:
 
 
             # =============================================
-            # CHECK PREVIOUS RATING
+            # CHECK SELECTED USER'S PREVIOUS RATING
             # =============================================
 
             previous_rating = (
                 get_song_rating(
 
-                    current_user_id,
+                    selected_user_id,
 
                     song[
                         "track_name"
@@ -495,7 +756,7 @@ else:
             ):
 
                 st.caption(
-                    f"Your current rating: "
+                    f"{selected_user_id}'s current rating: "
                     f"{previous_rating}/5"
                 )
 
@@ -561,7 +822,7 @@ else:
 
                         key=(
                             f"common_rating_"
-                            f"{current_user_id}_"
+                            f"{selected_user_id}_"
                             f"{index}"
                         ),
 
@@ -596,7 +857,7 @@ else:
 
                         key=(
                             f"common_save_"
-                            f"{current_user_id}_"
+                            f"{selected_user_id}_"
                             f"{index}"
                         ),
 
@@ -606,7 +867,7 @@ else:
 
 
             # =============================================
-            # SAVE RATING
+            # SAVE RATING FOR SELECTED USER
             # =============================================
 
             if save_button:
@@ -630,7 +891,7 @@ else:
                         message
                     ) = save_rating(
 
-                        current_user_id,
+                        selected_user_id,
 
                         song,
 
@@ -640,11 +901,26 @@ else:
 
                     if success:
 
+                        action_text = (
+
+                            "updated"
+
+                            if previous_rating
+                            is not None
+
+                            else
+
+                            "saved"
+                        )
+
+
                         st.session_state[
                             "rating_message"
                         ] = (
-                            f"{song['track_name']} "
-                            f"rated {rating_value}/5."
+                            f"{song['track_name']} rating "
+                            f"for {selected_user_id} "
+                            f"{action_text}: "
+                            f"{rating_value}/5."
                         )
 
 
@@ -659,20 +935,20 @@ else:
 
 
 # =========================================================
-# CURRENT USER RATINGS
+# SELECTED USER RATINGS
 # =========================================================
 
 st.divider()
 
 
 st.subheader(
-    "Your ratings"
+    f"{selected_user_id}'s ratings"
 )
 
 
 user_ratings = (
     get_user_ratings(
-        current_user_id
+        selected_user_id
     )
 )
 
@@ -734,5 +1010,6 @@ if user_ratings:
 else:
 
     st.info(
-        "You have not rated any songs yet."
+        f"{selected_user_id} has not rated "
+        f"any songs yet."
     )
