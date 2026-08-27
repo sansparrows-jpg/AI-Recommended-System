@@ -1,6 +1,7 @@
 import pandas as pd
 import streamlit as st
 
+
 from models.collaborative import (
     find_nearest_users,
     get_user_similarity_details,
@@ -62,6 +63,10 @@ def show_table(rows, columns=None):
         hide_index=True,
     )
 
+
+# =========================================================
+# FINAL TABLE
+# =========================================================
 
 def show_final_table(rows):
     if not rows:

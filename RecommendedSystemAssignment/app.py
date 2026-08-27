@@ -703,6 +703,7 @@ def run_navigation():
                     st.Page("pages/2_Evaluation.py", title="Evaluation"),
                     st.Page("pages/3_Rate_Music.py", title="Rate Music"),
                     st.Page("pages/4_Admin.py",title="User Data"),
+                    st.Page("pages/testResult.py",title="Admin Review"),
                 ],
             }
         )
