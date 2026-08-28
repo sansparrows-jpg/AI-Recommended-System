@@ -1,5 +1,4 @@
 user_id,track_name,artist,genre,mood,searched_at
-User002,BABY BABY,GOING STEADY,j-rock,Angry,2026-08-22 18:32:55
 User001,Money Rain - Phonk Remix,VTORNIK;Phonk,hip-hop,Happy,2026-08-23 19:54:51
 User001,Merry Christmas,Ed Sheeran;Elton John,pop,Happy,2026-08-23 19:55:01
 User001,Baby Shark,Afro Nursery Rhymes,kids,Happy,2026-08-23 19:55:45
@@ -54,23 +53,8 @@ User104,Danza Kuduro,Lucenzo;Don Omar,french,Happy,2026-08-25 21:43:18
 User103,Come Around Me,Justin Bieber,pop,Happy,2026-08-25 21:57:35
 User103,不該,Jay Chou;A-Mei Chang,mandopop,Angry,2026-08-25 22:05:44
 User104,All Around Me,Justin Bieber,pop,Chill,2026-08-26 15:42:20
-User002,Come Around Me,Justin Bieber,pop,Happy,2026-08-26 23:18:30
-User002,Perfect,Yung Pinch,emo,Angry,2026-08-26 23:18:45
-User002,11:11,Vini Vici;Pawan Nair,trance,Angry,2026-08-26 23:19:09
-User002,LALALA,Korsakoff,happy,Angry,2026-08-26 23:19:25
-User002,Animal,Def Leppard,hard-rock,Happy,2026-08-26 23:19:53
-User002,Photograph,Ed Sheeran,pop,Sad,2026-08-26 23:21:11
-User002,一路向北,Jay Chou,mandopop,Angry,2026-08-26 23:25:52
-User002,Payphone,Maroon 5;Wiz Khalifa,pop,Happy,2026-08-26 23:26:37
-User002,Animals,Maroon 5,pop,Angry,2026-08-26 23:26:57
-User002,BABY,FACE,emo,Happy,2026-08-26 23:27:32
-User002,Money Rain - Phonk Remix,VTORNIK;Phonk,hip-hop,Happy,2026-08-26 23:28:54
-User002,太聰明,Cheer Chen,mandopop,Sad,2026-08-26 23:29:04
 Admin,A Perfect House,Dear Seattle,garage,Angry,2026-08-27 12:08:22
 User001,一路向北,Jay Chou,mandopop,Angry,2026-08-27 13:27:31
-User002,Danza Kuduro,Don Omar;Lucenzo,hip-hop,Happy,2026-08-27 14:22:25
-User002,On & On,Cartoon;Daniel Levi,edm,Angry,2026-08-27 14:50:51
-User002,Baby,Justin Bieber;Ludacris,pop,Happy,2026-08-27 15:36:28
 User001,她的睫毛,Jay Chou,mandopop,Angry,2026-08-28 08:50:07
 User102,Goosebumps - Remix,Travis Scott;HVME,hip-hop,Happy,2026-08-28 09:55:41
 User102,Give It To Me Twice (feat. Sean Kingston & Rich The Kid),Party Favor;Rich The Kid;Sean Kingston,electronic,Happy,2026-08-28 09:56:01
@@ -80,3 +64,4 @@ User102,Without You,高爾宣 OSN,mandopop,Angry,2026-08-28 09:56:16
 User102,Invincible (feat. Daniel Caesar),Omar Apollo;Daniel Caesar,soul,Sad,2026-08-28 09:56:31
 User102,"""Christe, Redemptor omnium""",Traditional;Sistine Chapel Choir;Massimo Palombella,sleep,Sad,2026-08-28 10:02:10
 User102,太聰明,Cheer Chen,mandopop,Sad,2026-08-28 12:32:37
+User002,"10,000 Hours",Dan + Shay;Justin Bieber,country,Angry,2026-08-28 13:11:06
