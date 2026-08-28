@@ -1,4 +1,3 @@
-# =========================================================
 # HYBRID RECOMMENDATION SYSTEM
 #
 # Cold Start (< 10 ratings):
@@ -13,17 +12,13 @@
 #
 # Hybrid Score:
 #   0.4(Content Score) + 0.6(Collaborative Score)
-# =========================================================
 
 from models.content_based import recommend_song
 from models.collaborative import recommend_for_user
 from models.ratings import get_rating_count
 
 
-# =========================================================
 # CONFIGURATION
-# =========================================================
-
 RATING_THRESHOLD = 10
 
 CONTENT_NORMAL_WEIGHT = 0.4
@@ -33,10 +28,7 @@ CONTENT_COLD_START_WEIGHT = 1.0
 COLLABORATIVE_COLD_START_WEIGHT = 0.0
 
 
-# =========================================================
 # SONG KEY
-# =========================================================
-
 def create_hybrid_song_key(track_name, artist):
     """Use track name + artist as unique song identity."""
 
@@ -46,10 +38,7 @@ def create_hybrid_song_key(track_name, artist):
     )
 
 
-# =========================================================
 # HYBRID WEIGHTS
-# =========================================================
-
 def get_hybrid_weights(user_id):
     """
     < 10 ratings:
@@ -79,10 +68,7 @@ def get_hybrid_weights(user_id):
     )
 
 
-# =========================================================
 # NORMALIZE WEIGHTS
-# =========================================================
-
 def normalize_weights(content_weight, collaborative_weight):
     """Make sure both weights add up to 1."""
 
@@ -100,10 +86,7 @@ def normalize_weights(content_weight, collaborative_weight):
     )
 
 
-# =========================================================
 # SLOT ALLOCATION
-# =========================================================
-
 def get_blend_quotas(
     top_n,
     content_weight,
@@ -149,10 +132,7 @@ def get_blend_quotas(
     )
 
 
-# =========================================================
 # HYBRID SOURCE
-# =========================================================
-
 def determine_hybrid_source(
     content_score,
     collaborative_score,
@@ -171,10 +151,7 @@ def determine_hybrid_source(
     return "None"
 
 
-# =========================================================
 # BUILD RESULT
-# =========================================================
-
 def build_hybrid_result(
     song_key,
     content_lookup,
@@ -248,10 +225,7 @@ def build_hybrid_result(
     }
 
 
-# =========================================================
 # ADD UNIQUE SONGS
-# =========================================================
-
 def add_recommendations(
     results,
     limit,
@@ -288,10 +262,7 @@ def add_recommendations(
     return added
 
 
-# =========================================================
 # HYBRID RECOMMENDATION
-# =========================================================
-
 def hybrid_recommend(
     song_name,
     artist=None,
@@ -315,10 +286,7 @@ def hybrid_recommend(
     if force_weights is None and force_weight is not None:
         force_weights = force_weight
 
-    # -----------------------------------------------------
     # Get weights
-    # -----------------------------------------------------
-
     if force_weights is not None:
 
         content_weight = float(
@@ -346,10 +314,7 @@ def hybrid_recommend(
         )
     )
 
-    # -----------------------------------------------------
     # Get allocation
-    # -----------------------------------------------------
-
     content_quota, collaborative_quota = (
         get_blend_quotas(
             top_n,
@@ -358,10 +323,7 @@ def hybrid_recommend(
         )
     )
 
-    # -----------------------------------------------------
     # Generate recommendations
-    # -----------------------------------------------------
-
     content_results = recommend_song(
         song_name,
         artist,
@@ -381,10 +343,7 @@ def hybrid_recommend(
 
         collaborative_results = []
 
-    # -----------------------------------------------------
     # Lookup tables
-    # -----------------------------------------------------
-
     content_lookup = {
         create_hybrid_song_key(
             song["track_name"],
@@ -401,10 +360,7 @@ def hybrid_recommend(
         for song in collaborative_results
     }
 
-    # -----------------------------------------------------
     # Select candidates
-    # -----------------------------------------------------
-
     selected_keys = []
     blend_groups = {}
 
@@ -424,10 +380,7 @@ def hybrid_recommend(
         "Collaborative Slot",
     )
 
-    # -----------------------------------------------------
     # Backup if Collaborative has too few songs
-    # -----------------------------------------------------
-
     if collaborative_added < collaborative_quota:
 
         missing = top_n - len(
@@ -442,10 +395,7 @@ def hybrid_recommend(
             "Content-Based Backup",
         )
 
-    # -----------------------------------------------------
     # Backup if Content-Based has too few songs
-    # -----------------------------------------------------
-
     if len(selected_keys) < top_n:
 
         missing = top_n - len(
@@ -460,10 +410,7 @@ def hybrid_recommend(
             "Collaborative Backup",
         )
 
-    # -----------------------------------------------------
     # Build final results
-    # -----------------------------------------------------
-
     final_results = [
         build_hybrid_result(
             song_key,
@@ -486,10 +433,7 @@ def hybrid_recommend(
     return final_results[:top_n]
 
 
-# =========================================================
 # TEST
-# =========================================================
-
 if __name__ == "__main__":
 
     TEST_USER = "User102"

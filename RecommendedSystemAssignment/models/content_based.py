@@ -5,17 +5,11 @@ from sklearn.metrics.pairwise import cosine_similarity
 from models.similarity import prepare_similarity
 
 
-# =========================================================
 # LOAD DATA
-# =========================================================
-
 songs, text_matrix, audio_matrix = prepare_similarity()
 
 
-# =========================================================
 # NORMALIZATION
-# =========================================================
-
 def normalize_track_title(track_name):
     """
     Normalize song title for duplicate/self detection.
@@ -67,10 +61,7 @@ def create_song_identity(track_name, artist):
     )
 
 
-# =========================================================
 # SONG LOOKUP
-# =========================================================
-
 # Exact track name + artist are used to locate
 # the exact song selected by the user.
 
@@ -89,10 +80,7 @@ for position, row in enumerate(
         song_lookup[key] = position
 
 
-# =========================================================
 # FIND SELECTED SONG
-# =========================================================
-
 def find_song_index(song_name, artist=None):
     """Return the dataset position of the selected song."""
 
@@ -125,9 +113,7 @@ def find_song_index(song_name, artist=None):
     return None
 
 
-# =========================================================
 # CONTENT-BASED RECOMMENDATION
-# =========================================================
 
 def recommend_song(
     song_name,
@@ -156,29 +142,22 @@ def recommend_song(
         selected_song["artists"],
     )
 
-    # -----------------------------------------------------
     # TEXT SIMILARITY
-    # -----------------------------------------------------
 
     text_scores = cosine_similarity(
         text_matrix[song_index],
         text_matrix,
     ).flatten()
 
-    # -----------------------------------------------------
     # AUDIO SIMILARITY
-    # -----------------------------------------------------
 
     audio_scores = cosine_similarity(
         audio_matrix[song_index].reshape(1, -1),
         audio_matrix,
     ).flatten()
 
-    # -----------------------------------------------------
     # FINAL SCORE
-    #
     # 60% text + 40% audio
-    # -----------------------------------------------------
 
     final_scores = (
         0.6 * text_scores
@@ -192,9 +171,7 @@ def recommend_song(
         reverse=True,
     )
 
-    # -----------------------------------------------------
     # BUILD TOP N
-    # -----------------------------------------------------
 
     recommendations = []
 
@@ -244,10 +221,7 @@ def recommend_song(
     return recommendations
 
 
-# =========================================================
 # TEST
-# =========================================================
-
 if __name__ == "__main__":
 
     TEST_SONG = "Invincible (feat. Daniel Caesar)"

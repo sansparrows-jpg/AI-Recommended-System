@@ -1,4 +1,3 @@
-# =========================================================
 # COLLABORATIVE FILTERING
 #
 # Real ratings:
@@ -15,7 +14,6 @@
 #
 # Final Score:
 # 50% User-Based + 50% Item-Based
-# =========================================================
 
 import math
 
@@ -29,9 +27,7 @@ from models.real_user_data import (
 from models.ratings import get_rating_count
 
 
-# =========================================================
 # CONFIGURATION
-# =========================================================
 
 K_NEIGHBORS = 5
 MIN_RECOMMEND_RATING = 4
@@ -41,9 +37,7 @@ USER_WEIGHT = 0.5
 ITEM_WEIGHT = 0.5
 
 
-# =========================================================
 # SPOTIFY POPULARITY LOOKUP
-# =========================================================
 
 spotify_songs = preprocess_data()
 
@@ -63,9 +57,7 @@ for _, row in spotify_songs.iterrows():
         )
 
 
-# =========================================================
 # BASIC HELPERS
-# =========================================================
 
 def distance_to_similarity(distance):
     """Convert Euclidean Distance to similarity."""
@@ -170,10 +162,7 @@ def get_recommendation_source(
     return "None"
 
 
-# =========================================================
 # USER-BASED KNN
-# =========================================================
-
 def calculate_user_distance(
     user_a,
     user_b,
@@ -402,9 +391,7 @@ def user_based_recommendations(
     return results[:top_n]
 
 
-# =========================================================
 # ITEM-BASED KNN
-# =========================================================
 
 def calculate_item_distance(
     song_a,
@@ -583,9 +570,7 @@ def item_based_recommendations(
     return results[:top_n]
 
 
-# =========================================================
 # USER SIMILARITY EXPLANATION
-# =========================================================
 
 def get_user_similarity_details(
     user_id,
@@ -735,9 +720,7 @@ def get_nearest_users_explanation(
     return explanations
 
 
-# =========================================================
 # USER-BASED RECOMMENDATION EXPLANATION
-# =========================================================
 
 def get_recommendation_support(
     user_id,
@@ -830,9 +813,7 @@ def get_recommendation_support(
     }
 
 
-# =========================================================
 # ITEM-BASED RECOMMENDATION EXPLANATION
-# =========================================================
 
 def get_item_recommendation_support(
     user_id,
@@ -968,9 +949,7 @@ def get_item_recommendation_support(
     }
 
 
-# =========================================================
 # FINAL COLLABORATIVE FILTERING
-# =========================================================
 
 def recommend_for_user(
     user_id,
@@ -1017,9 +996,7 @@ def recommend_for_user(
 
     combined = {}
 
-    # -----------------------------------------------------
     # USER-BASED RESULTS
-    # -----------------------------------------------------
 
     for song in user_results:
 
@@ -1038,9 +1015,7 @@ def recommend_for_user(
                 ),
         }
 
-    # -----------------------------------------------------
     # ITEM-BASED RESULTS
-    # -----------------------------------------------------
 
     for song in item_results:
 
@@ -1067,9 +1042,7 @@ def recommend_for_user(
                 "item_knn_score"
             ] = song["item_knn_score"]
 
-    # -----------------------------------------------------
     # FINAL 50/50 SCORE
-    # -----------------------------------------------------
 
     results = []
 
@@ -1137,14 +1110,12 @@ def recommend_for_user(
                 ),
         })
 
-    # -----------------------------------------------------
     # STABLE FINAL RANKING
     #
     # 1. Collaborative score
     # 2. User-Based score
     # 3. Item-Based score
     # 4. Track name / artist for equal-score ties
-    # -----------------------------------------------------
 
     results.sort(
         key=lambda song: (
@@ -1159,9 +1130,7 @@ def recommend_for_user(
     return results[:top_n]
 
 
-# =========================================================
 # TEST
-# =========================================================
 
 if __name__ == "__main__":
 
@@ -1182,9 +1151,7 @@ if __name__ == "__main__":
         get_rating_count(TEST_USER)
     )
 
-    # -----------------------------------------------------
     # NEAREST USERS
-    # -----------------------------------------------------
 
     print()
     print("=" * 55)
@@ -1204,9 +1171,7 @@ if __name__ == "__main__":
             f"Common: {neighbour['common_ratings']}"
         )
 
-    # -----------------------------------------------------
     # FINAL RECOMMENDATIONS
-    # -----------------------------------------------------
 
     print()
     print("=" * 55)

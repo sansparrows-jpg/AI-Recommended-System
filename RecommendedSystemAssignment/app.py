@@ -7,11 +7,19 @@ from urllib.request import Request, urlopen
 
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 
 from models.auth import authenticate, load_users, register_user
 from models.history import add_search_history, clear_search_history, get_recent_searches
 from models.preprocessing import preprocess_data
 from models.ratings import get_rating_count, get_song_rating, save_rating
+
+from spotify_auth import (
+    disconnect_spotify,
+    get_spotify_login_url,
+    handle_spotify_callback,
+    spotify_is_connected,
+)
 
 RECENT_SEARCH_LIMIT = 20
 
@@ -21,17 +29,11 @@ RATINGS_PATH = (
     / "real_user_ratings.csv"
 )
 
-
 TRACKS_DATA_PATH = (
     Path(__file__).resolve().parent
     / "data"
     / "spotify-tracks-dataset-detailed.csv"
 )
-
-
-# =========================================================
-# LUXURY MUSIC APPLICATION UI
-# =========================================================
 
 def apply_luxury_ui():
     """
@@ -551,7 +553,7 @@ def apply_luxury_ui():
                 !important;
             border-radius:
                 16px !important;
-            overflow: hidden !important;
+            overflow: visible !important;
         }
 
         .st-key-liked_songs [data-testid="stImage"] img {
@@ -585,7 +587,6 @@ def apply_luxury_ui():
         .st-key-recent_search_list [data-testid="stVerticalBlockBorderWrapper"],
         .st-key-search_results_list [data-testid="stVerticalBlockBorderWrapper"] {
             min-height: 82px !important;
-            max-height: 82px !important;
             width: 100% !important;
             background:
                 rgba(18, 18, 30, 0.94)
@@ -636,6 +637,56 @@ def apply_luxury_ui():
                 !important;
         }
 
+
+
+
+
+        /* ================================================
+           SEARCH 30-SECOND AUDIO PREVIEW
+        ================================================ */
+
+        .st-key-recent_search_list iframe,
+        .st-key-search_results_list iframe {
+            width: 100% !important;
+            border-radius: 12px !important;
+        }
+
+
+        /* ================================================
+           NOW PLAYING
+        ================================================ */
+
+        .st-key-now_playing [data-testid="stVerticalBlockBorderWrapper"] {
+            background:
+                linear-gradient(
+                    135deg,
+                    rgba(28, 26, 47, 0.97),
+                    rgba(12, 12, 22, 0.98)
+                ) !important;
+            border:
+                1px solid
+                rgba(167, 139, 250, 0.20)
+                !important;
+            border-radius:
+                18px !important;
+            padding:
+                0.65rem !important;
+            box-shadow:
+                0 14px 34px
+                rgba(0, 0, 0, 0.20);
+        }
+
+        .st-key-now_playing [data-testid="stImage"] img {
+            width: 100% !important;
+            aspect-ratio: 1 / 1;
+            object-fit: cover !important;
+            border-radius: 14px !important;
+        }
+
+        .st-key-now_playing iframe {
+            border-radius: 14px !important;
+        }
+
         @media (max-width: 800px) {
             .block-container {
                 padding-top: 4rem !important;
@@ -658,7 +709,6 @@ st.set_page_config(
 # Apply the luxury music application appearance.
 apply_luxury_ui()
 
-
 def init_session():
     defaults = {
         "logged_in": False,
@@ -669,8 +719,11 @@ def init_session():
     for key, value in defaults.items():
         st.session_state.setdefault(key, value)
 
-
 def logout():
+    # Spotify authorization belongs to the current
+    # SoundScope user session, so clear it on logout.
+    disconnect_spotify()
+
     keys_to_clear = [
         "selected_song",
         "selected_artist",
@@ -681,6 +734,7 @@ def logout():
         "final_results",
         "selected_song_details",
         "song_search_query",
+        "spotify_search_preview",
     ]
 
     st.session_state["logged_in"] = False
@@ -692,7 +746,6 @@ def logout():
         st.session_state.pop(key, None)
 
     st.rerun()
-
 
 def render_auth_page():
     st.title("SoundScope", anchor=False)
@@ -770,12 +823,6 @@ def render_auth_page():
                     else:
                         st.error(message)
 
-
-
-# =========================================================
-# SPOTIFY ALBUM COVER HELPERS
-# =========================================================
-
 @st.cache_data(show_spinner=False)
 def load_track_id_lookup():
     """
@@ -844,7 +891,6 @@ def load_track_id_lookup():
     )
 
     return lookup
-
 
 def find_spotify_track_id(
     track_name,
@@ -922,7 +968,6 @@ def find_spotify_track_id(
         "track_id"
     ]
 
-
 @st.cache_data(
     ttl=86400,
     show_spinner=False,
@@ -985,6 +1030,13 @@ def get_spotify_oembed(
         "image_url":
             thumbnail_url,
 
+        # Spotify's official oEmbed player HTML.
+        "embed_html":
+            data.get(
+                "html",
+                "",
+            ),
+
         "spotify_url":
             spotify_url,
 
@@ -994,7 +1046,6 @@ def get_spotify_oembed(
                 "",
             ),
     }
-
 
 def get_song_cover(
     track_name,
@@ -1016,7 +1067,6 @@ def get_song_cover(
     return get_spotify_oembed(
         track_id
     )
-
 
 def render_song_cover(
     track_name,
@@ -1067,7 +1117,147 @@ def render_song_cover(
 
     return None
 
+def render_spotify_player(
+    track_name,
+    artist,
+):
+    """
+    Display Spotify's official embedded player
+    for the selected SoundScope song.
 
+    The audio is streamed by Spotify.
+    No audio file is copied into this project.
+    """
+
+    track_id = find_spotify_track_id(
+        track_name,
+        artist,
+    )
+
+    if not track_id:
+        st.info(
+            "Spotify playback is not available "
+            "for this song."
+        )
+        return
+
+    spotify_data = get_spotify_oembed(
+        track_id
+    )
+
+    if not spotify_data:
+        st.info(
+            "Spotify playback is not available "
+            "for this song."
+        )
+        return
+
+    embed_html = spotify_data.get(
+        "embed_html",
+        "",
+    )
+
+    # Fallback if Spotify oEmbed does not return HTML.
+    if not embed_html:
+        embed_url = (
+            "https://open.spotify.com/embed/track/"
+            + str(track_id).strip()
+        )
+
+        embed_html = f"""
+        <iframe
+            src="{embed_url}"
+            width="100%"
+            height="152"
+            frameborder="0"
+            allowfullscreen=""
+            allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+            loading="lazy">
+        </iframe>
+        """
+
+    components.html(
+        embed_html,
+        height=170,
+        scrolling=False,
+    )
+
+def render_now_playing():
+    """
+    Show the currently selected song together with
+    its album cover and Spotify embedded player.
+    """
+
+    song = st.session_state.get(
+        "selected_song_details"
+    )
+
+    if not song:
+        return
+
+    with st.container(
+        border=True,
+        key="now_playing",
+    ):
+        st.subheader(
+            "Now Playing"
+        )
+
+        cover_col, player_col = st.columns(
+            [0.9, 3.1],
+            vertical_alignment="center",
+        )
+
+        with cover_col:
+            cover = get_song_cover(
+                song["track_name"],
+                song["artists"],
+            )
+
+            if cover:
+                st.image(
+                    cover["image_url"],
+                    width="stretch",
+                )
+            else:
+                st.markdown(
+                    """
+                    <div style="
+                        width:100%;
+                        aspect-ratio:1/1;
+                        display:flex;
+                        align-items:center;
+                        justify-content:center;
+                        border-radius:14px;
+                        font-size:52px;
+                        background:
+                            linear-gradient(
+                                135deg,
+                                rgba(110,69,215,0.30),
+                                rgba(214,179,106,0.12)
+                            );
+                    ">
+                        🎵
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+
+        with player_col:
+            st.markdown(
+                f"### {song['track_name']}"
+            )
+
+            st.caption(
+                f"{song['artists']} · "
+                f"{song['track_genre']} · "
+                f"{song['mood']}"
+            )
+
+            render_spotify_player(
+                song["track_name"],
+                song["artists"],
+            )
 
 def fold_search_text(text):
     return "".join(
@@ -1075,7 +1265,6 @@ def fold_search_text(text):
         for char in str(text).casefold()
         if char.isalnum() and char not in "aeiou"
     )
-
 
 @st.cache_data(show_spinner=False)
 def get_song_options():
@@ -1102,7 +1291,6 @@ def get_song_options():
 
     return songs, search_songs
 
-
 def get_user_count():
     """Count normal users only; admin accounts are excluded."""
     users = load_users()
@@ -1117,7 +1305,6 @@ def get_user_count():
         .eq("user")
         .sum()
     )
-
 
 def filter_song_options(query, search_songs, limit=10):
     query = query.strip().casefold()
@@ -1155,7 +1342,6 @@ def filter_song_options(query, search_songs, limit=10):
         .head(limit)
         .to_dict("records")
     )
-
 
 def generate_recommendations(song_name, artist, user_id):
     from models.collaborative import recommend_for_user
@@ -1203,7 +1389,6 @@ def generate_recommendations(song_name, artist, user_id):
             "final_results": final_results,
         }
 
-
 def handle_song_selection(song, user_id):
     st.session_state["selected_song_details"] = {
         "track_name": song["track_name"],
@@ -1222,7 +1407,6 @@ def handle_song_selection(song, user_id):
         )
 
     st.toast("Recommendations generated successfully.", icon="🎧")
-
 
 def render_top_10(final_results):
     st.subheader("Top 10 recommended songs")
@@ -1252,7 +1436,125 @@ def render_top_10(final_results):
         height=390,
     )
 
+def render_spotify_30_second_embed(
+    track_name,
+    artist,
+):
+    """
+    Render Spotify's official embedded track player and
+    automatically stop playback after 30 seconds.
 
+    This uses the exact Spotify track_id from the dataset.
+    It does not depend on Spotify's deprecated preview_url.
+    """
+
+    track_id = find_spotify_track_id(
+        track_name,
+        artist,
+    )
+
+    if not track_id:
+        st.info(
+            "Spotify playback is not available "
+            "for this song."
+        )
+        return
+
+    # Every Streamlit component is isolated in its own iframe,
+    # so this HTML can safely create one Spotify player.
+    player_id = (
+        "spotify_player_"
+        + "".join(
+            char
+            for char in str(track_id)
+            if char.isalnum()
+        )
+    )
+
+    spotify_uri = (
+        "spotify:track:"
+        + str(track_id).strip()
+    )
+
+    preview_html = f"""
+    <div
+        id="{player_id}"
+        style="
+            width:100%;
+            min-height:82px;
+        ">
+    </div>
+
+    <script
+        src="https://open.spotify.com/embed/iframe-api/v1"
+        async>
+    </script>
+
+    <script>
+        window.onSpotifyIframeApiReady = (IFrameAPI) => {{
+            const element = document.getElementById(
+                "{player_id}"
+            );
+
+            const options = {{
+                width: "100%",
+                height: 80,
+                uri: "{spotify_uri}",
+                theme: "dark"
+            }};
+
+            const callback = (EmbedController) => {{
+                let hasStoppedAtThirty = false;
+
+                EmbedController.addListener(
+                    "playback_update",
+                    (event) => {{
+                        const state = event.data;
+
+                        if (
+                            !hasStoppedAtThirty &&
+                            !state.isPaused &&
+                            state.position >= 30000
+                        ) {{
+                            hasStoppedAtThirty = true;
+
+                            EmbedController.pause();
+
+                            // Return to the start so the next
+                            // play gives another 30-second sample.
+                            setTimeout(
+                                () => {{
+                                    EmbedController.seek(0);
+                                    hasStoppedAtThirty = false;
+                                }},
+                                250
+                            );
+                        }}
+
+                        if (
+                            state.position < 30000 &&
+                            state.isPaused
+                        ) {{
+                            hasStoppedAtThirty = false;
+                        }}
+                    }}
+                );
+            }};
+
+            IFrameAPI.createController(
+                element,
+                options,
+                callback
+            );
+        }};
+    </script>
+    """
+
+    components.html(
+        preview_html,
+        height=92,
+        scrolling=False,
+    )
 
 def render_search_song_row(
     song,
@@ -1260,11 +1562,14 @@ def render_search_song_row(
     button_key,
 ):
     """
-    Display one compact song row with album artwork.
+    Display one compact song row with:
+    - album artwork
+    - song information
+    - Spotify 30-second player
+    - Open button
 
-    This helper is shared by Recent Searches and
-    Search Results so both sections always have
-    the same frame size and alignment.
+    Recent Searches and Search Results share this
+    same component so both layouts stay consistent.
     """
 
     track_name = str(
@@ -1283,11 +1588,24 @@ def render_search_song_row(
         song["mood"]
     )
 
+    preview_state_key = (
+        "spotify_search_preview"
+    )
+
+    this_preview_key = (
+        f"preview_{button_key}"
+    )
+
     with st.container(
         border=True
     ):
-        image_col, details_col, action_col = st.columns(
-            [0.75, 4.15, 1.0],
+        (
+            image_col,
+            details_col,
+            preview_col,
+            action_col,
+        ) = st.columns(
+            [0.75, 3.55, 0.95, 0.85],
             vertical_alignment="center",
         )
 
@@ -1322,17 +1640,51 @@ def render_search_song_row(
                     unsafe_allow_html=True,
                 )
 
-        # Song details
+        # Song information
         with details_col:
             st.markdown(
                 f"**{track_name}**"
             )
 
             st.caption(
-                f"{artist}  ·  {genre}  ·  {mood}"
+                f"{artist} · {genre} · {mood}"
             )
 
-        # Open song
+        # Show / hide Spotify player.
+        with preview_col:
+            preview_is_open = (
+                st.session_state.get(
+                    preview_state_key
+                )
+                == this_preview_key
+            )
+
+            preview_label = (
+                "Hide"
+                if preview_is_open
+                else "▶ 30s"
+            )
+
+            if st.button(
+                preview_label,
+                key=(
+                    f"{this_preview_key}_button"
+                ),
+                width="stretch",
+            ):
+                if preview_is_open:
+                    st.session_state.pop(
+                        preview_state_key,
+                        None,
+                    )
+                else:
+                    st.session_state[
+                        preview_state_key
+                    ] = this_preview_key
+
+                st.rerun()
+
+        # Keep the existing recommendation action.
         with action_col:
             if st.button(
                 "Open",
@@ -1344,7 +1696,21 @@ def render_search_song_row(
                     user_id,
                 )
 
+        # Spotify player appears inside this same frame.
+        if (
+            st.session_state.get(
+                preview_state_key
+            )
+            == this_preview_key
+        ):
+            st.caption(
+                "Spotify preview · automatically stops at 30 seconds"
+            )
 
+            render_spotify_30_second_embed(
+                track_name,
+                artist,
+            )
 
 def render_recent_searches(user_id):
     """
@@ -1413,8 +1779,6 @@ def render_recent_searches(user_id):
                     f"recent_song_{index}"
                 ),
             )
-
-
 
 def render_collaborative_for_you(user_id):
     """
@@ -1564,8 +1928,6 @@ def render_collaborative_for_you(user_id):
                         user_id,
                     )
 
-
-
 def load_current_user_ratings(user_id):
     """
     Load ratings for the currently logged-in user only.
@@ -1608,8 +1970,6 @@ def load_current_user_ratings(user_id):
         )
 
     return user_ratings.reset_index(drop=True)
-
-
 
 def get_user_taste_profile(user_id):
     """
@@ -1682,7 +2042,6 @@ def get_user_taste_profile(user_id):
             )
 
     return profile
-
 
 def render_continue_listening(user_id):
     """
@@ -1806,8 +2165,6 @@ def render_continue_listening(user_id):
                         normal_song,
                         user_id,
                     )
-
-
 
 def render_browse_music(
     user_id,
@@ -2090,8 +2447,6 @@ def render_browse_music(
                                 song,
                                 user_id,
                             )
-
-
 
 def render_user_ratings(user_id):
     """
@@ -2395,8 +2750,6 @@ def render_user_ratings(user_id):
                     height=390,
                 )
 
-
-
 def render_search_results(
     query,
     search_songs,
@@ -2442,8 +2795,6 @@ def render_search_results(
                     f"search_song_{index}"
                 ),
             )
-
-
 
 def render_rating_section(user_id):
     song = st.session_state.get("selected_song_details")
@@ -2494,7 +2845,6 @@ def render_rating_section(user_id):
         rating_count = get_rating_count(user_id)
         label = "song" if rating_count == 1 else "songs"
         st.caption(f"You have rated {rating_count} {label}.")
-
 
 def render_discover_page():
     """
@@ -2563,6 +2913,36 @@ def render_discover_page():
         )
 
         st.caption(role_label)
+
+        # Spotify Premium connection used by the
+        # Web Playback SDK.
+        if spotify_is_connected():
+            st.caption("Spotify · Connected")
+
+            if st.button(
+                "Disconnect Spotify",
+                key="disconnect_spotify",
+                width="stretch",
+            ):
+                disconnect_spotify()
+                st.rerun()
+
+        else:
+            try:
+                spotify_login_url = (
+                    get_spotify_login_url()
+                )
+
+                st.link_button(
+                    "Connect Spotify",
+                    spotify_login_url,
+                    width="stretch",
+                )
+
+            except Exception as error:
+                st.caption(
+                    "Spotify configuration is missing."
+                )
 
         if st.button(
             "Logout",
@@ -2648,6 +3028,12 @@ def render_discover_page():
     if final_results:
         st.space("small")
 
+        # Play the selected song using Spotify's official
+        # embedded player.
+        render_now_playing()
+
+        st.space("small")
+
         result_col, rating_col = st.columns(
             [2.5, 1],
             vertical_alignment="top",
@@ -2694,8 +3080,6 @@ def render_discover_page():
             user_id
         )
 
-
-
 def run_navigation():
     discover_page = st.Page(
         render_discover_page,
@@ -2721,16 +3105,34 @@ def run_navigation():
 
     navigation.run()
 
-
 def main():
     init_session()
+
+    # Handle Spotify's OAuth redirect before rendering
+    # the normal SoundScope pages.
+    spotify_callback = handle_spotify_callback()
+
+    if spotify_callback == "connected":
+        st.toast(
+            "Spotify connected successfully.",
+            icon="✅",
+        )
+
+    elif spotify_callback == "error":
+        error_message = st.session_state.get(
+            "spotify_auth_error",
+            "Spotify connection failed.",
+        )
+
+        st.error(
+            f"Spotify connection failed: {error_message}"
+        )
 
     if not st.session_state["logged_in"]:
         render_auth_page()
         return
 
     run_navigation()
-
 
 if __name__ == "__main__":
     main()
