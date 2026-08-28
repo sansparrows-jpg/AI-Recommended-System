@@ -1891,7 +1891,7 @@ def render_discover_page():
             st.caption(
                 "Use the sidebar to open Results, "
                 "Evaluation, Rate Music, User Data, "
-                "and Admin Review."
+                "and User Data."
             )
 
     else:
@@ -1930,7 +1930,6 @@ def run_navigation():
                     st.Page("pages/2_Evaluation.py", title="Evaluation"),
                     st.Page("pages/3_Rate_Music.py", title="Rate Music"),
                     st.Page("pages/4_Admin.py",title="User Data"),
-                    st.Page("pages/testResult.py",title="Admin Review"),
                 ],
             }
         )
