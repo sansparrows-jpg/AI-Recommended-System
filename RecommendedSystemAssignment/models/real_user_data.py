@@ -1,4 +1,4 @@
-# =========================================================
+
 # REAL USER DATA
 #
 # Builds the User × Song rating matrix
@@ -8,17 +8,13 @@
 # Missing ratings remain NaN.
 # They are NOT converted to 0 because
 # "not rated" does not mean "dislike".
-# =========================================================
 
 import pandas as pd
 
 from models.ratings import load_ratings
 
 
-# =========================================================
 # CREATE UNIQUE SONG KEY
-# =========================================================
-
 def create_song_key(
     track_name,
     artist
@@ -38,10 +34,7 @@ def create_song_key(
     )
 
 
-# =========================================================
 # LOAD REAL RATINGS
-# =========================================================
-
 def load_real_ratings():
     """
     Load real user ratings and
@@ -63,9 +56,7 @@ def load_real_ratings():
     )
 
 
-    # =====================================================
     # CLEAN VALUES
-    # =====================================================
 
     ratings[
         "user_id"
@@ -152,10 +143,7 @@ def load_real_ratings():
     ].copy()
 
 
-    # =====================================================
     # CREATE UNIQUE SONG KEY
-    # =====================================================
-
     ratings[
         "song_key"
     ] = ratings.apply(
@@ -180,9 +168,7 @@ def load_real_ratings():
     return ratings
 
 
-# =========================================================
 # BUILD USER × SONG MATRIX
-# =========================================================
 
 def load_real_user_matrix():
     """
@@ -233,10 +219,7 @@ def load_real_user_matrix():
     return user_matrix
 
 
-# =========================================================
 # BUILD SONG METADATA TABLE
-# =========================================================
-
 def load_song_metadata():
     """
     Create metadata lookup for every
@@ -288,10 +271,7 @@ def load_song_metadata():
     return metadata
 
 
-# =========================================================
 # GET ONE USER'S RATINGS
-# =========================================================
-
 def get_user_rating_series(
     user_id
 ):
@@ -333,9 +313,7 @@ def get_user_rating_series(
     )
 
 
-# =========================================================
 # GET SONG INFORMATION
-# =========================================================
 
 def get_song_information(
     song_key
@@ -374,9 +352,7 @@ def get_song_information(
     )
 
 
-# =========================================================
 # TEST
-# =========================================================
 
 if __name__ == "__main__":
 

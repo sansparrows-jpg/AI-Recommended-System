@@ -1,4 +1,4 @@
-# =========================================================
+
 # REAL USER RATING MANAGEMENT
 #
 # This file stores ratings entered by
@@ -10,7 +10,6 @@
 # 3 = Neutral
 # 4 = Like
 # 5 = Strongly like
-# =========================================================
 
 from datetime import datetime
 from pathlib import Path
@@ -18,10 +17,7 @@ from pathlib import Path
 import pandas as pd
 
 
-# =========================================================
 # RATINGS FILE
-# =========================================================
-
 RATINGS_PATH = (
     Path(__file__).resolve().parents[1]
     / "data"
@@ -40,10 +36,7 @@ RATING_COLUMNS = [
 ]
 
 
-# =========================================================
 # LOAD RATINGS
-# =========================================================
-
 def load_ratings():
     """
     Load all real user ratings.
@@ -91,10 +84,7 @@ def load_ratings():
     return ratings
 
 
-# =========================================================
 # SAVE / UPDATE RATING
-# =========================================================
-
 def save_rating(
     user_id,
     song,
@@ -111,10 +101,7 @@ def save_rating(
     + Artist
     """
 
-    # =====================================================
     # VALIDATE RATING
-    # =====================================================
-
     try:
 
         rating = int(
@@ -170,9 +157,7 @@ def save_rating(
     ).strip()
 
 
-    # =====================================================
     # FIND EXISTING RATING
-    # =====================================================
 
     if not ratings.empty:
 
@@ -224,10 +209,7 @@ def save_rating(
         )
 
 
-    # =====================================================
     # UPDATE EXISTING RATING
-    # =====================================================
-
     if existing_rating.any():
 
         ratings.loc[
@@ -256,10 +238,7 @@ def save_rating(
         )
 
 
-    # =====================================================
     # CREATE NEW RATING
-    # =====================================================
-
     new_rating = pd.DataFrame(
         [
             {
@@ -311,10 +290,7 @@ def save_rating(
     )
 
 
-# =========================================================
 # GET CURRENT USER RATINGS
-# =========================================================
-
 def get_user_ratings(
     user_id
 ):
@@ -364,9 +340,7 @@ def get_user_ratings(
     )
 
 
-# =========================================================
 # GET ONE SONG RATING
-# =========================================================
 
 def get_song_rating(
     user_id,
@@ -446,9 +420,7 @@ def get_song_rating(
     )
 
 
-# =========================================================
 # COUNT USER RATINGS
-# =========================================================
 
 def get_rating_count(
     user_id
@@ -465,9 +437,7 @@ def get_rating_count(
     )
 
 
-# =========================================================
 # CHECK COLLABORATIVE READINESS
-# =========================================================
 
 def has_enough_ratings(
     user_id,
@@ -487,10 +457,7 @@ def has_enough_ratings(
     )
 
 
-# =========================================================
 # TEST
-# =========================================================
-
 if __name__ == "__main__":
 
     print()

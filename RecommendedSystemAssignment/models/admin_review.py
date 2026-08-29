@@ -1,7 +1,4 @@
-# =========================================================
 # ADMIN RECOMMENDATION REVIEW SERVICE
-# =========================================================
-
 from pathlib import Path
 
 import pandas as pd
@@ -10,10 +7,7 @@ from models.auth import load_users
 from models.ratings import get_rating_count
 
 
-# =========================================================
 # PATH
-# =========================================================
-
 PROJECT_ROOT = (
     Path(__file__)
     .resolve()
@@ -27,10 +21,7 @@ SEARCH_HISTORY_PATH = (
 )
 
 
-# =========================================================
 # LOAD SEARCH HISTORY
-# =========================================================
-
 def load_search_history():
     """
     Load the existing search_history.csv.
@@ -58,9 +49,7 @@ def load_search_history():
     return history
 
 
-# =========================================================
 # GET NORMAL USERS
-# =========================================================
 
 def get_reviewable_users():
     """
@@ -102,9 +91,7 @@ def get_reviewable_users():
         )
 
 
-    # =====================================================
     # ROLE FILTER
-    # =====================================================
 
     if "role" in users.columns:
 
@@ -148,9 +135,7 @@ def get_reviewable_users():
         ].copy()
 
 
-    # =====================================================
     # RETURN SAFE COLUMNS ONLY
-    # =====================================================
 
     return (
         users[
@@ -173,10 +158,7 @@ def get_reviewable_users():
     )
 
 
-# =========================================================
 # GET USERNAME
-# =========================================================
-
 def get_username(
     user_id
 ):
@@ -218,10 +200,7 @@ def get_username(
     )
 
 
-# =========================================================
 # GET LATEST SEARCH
-# =========================================================
-
 def get_latest_user_search(
     user_id
 ):
@@ -277,10 +256,7 @@ def get_latest_user_search(
         return None
 
 
-    # =====================================================
     # KEEP ORIGINAL CSV ORDER
-    # =====================================================
-
     user_history[
         "_row_order"
     ] = range(
@@ -288,10 +264,7 @@ def get_latest_user_search(
     )
 
 
-    # =====================================================
     # FIND TIME COLUMN
-    # =====================================================
-
     timestamp_candidates = [
         "searched_at",
         "search_time",
@@ -312,10 +285,7 @@ def get_latest_user_search(
     )
 
 
-    # =====================================================
     # FIND NEWEST RECORD
-    # =====================================================
-
     if timestamp_column:
 
         user_history[
@@ -371,10 +341,7 @@ def get_latest_user_search(
         )
 
 
-    # =====================================================
     # COLUMN SUPPORT
-    # =====================================================
-
     if "artist" in user_history.columns:
 
         artist_column = "artist"
@@ -401,10 +368,7 @@ def get_latest_user_search(
         genre_column = None
 
 
-    # =====================================================
     # VALUES
-    # =====================================================
-
     track_name = str(
         latest.get(
             "track_name",
@@ -490,10 +454,7 @@ def get_latest_user_search(
     }
 
 
-# =========================================================
 # GENERATE ADMIN REVIEW
-# =========================================================
-
 def generate_user_review(
     user_id
 ):
@@ -523,10 +484,7 @@ def generate_user_review(
     )
 
 
-    # =====================================================
     # GET LATEST SEARCH
-    # =====================================================
-
     latest_search = (
         get_latest_user_search(
             user_id
@@ -553,20 +511,14 @@ def generate_user_review(
     )
 
 
-    # =====================================================
     # CONTENT-BASED
-    # =====================================================
-
     content_results = recommend_song(
         song_name,
         artist,
     )
 
 
-    # =====================================================
     # COLLABORATIVE
-    # =====================================================
-
     collaborative_results = (
         recommend_for_user(
             user_id,
@@ -575,10 +527,7 @@ def generate_user_review(
     )
 
 
-    # =====================================================
     # HYBRID
-    # =====================================================
-
     hybrid_results = hybrid_recommend(
         song_name,
         artist,
@@ -586,10 +535,7 @@ def generate_user_review(
     )
 
 
-    # =====================================================
     # FINAL TOP 10
-    # =====================================================
-
     final_results = []
 
 
@@ -627,10 +573,7 @@ def generate_user_review(
     )
 
 
-    # =====================================================
     # RETURN TEMPORARY RESULT
-    # =====================================================
-
     return {
 
         "user_id":

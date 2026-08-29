@@ -3,21 +3,14 @@ from pathlib import Path
 
 import pandas as pd
 
-
-# =========================================================
 # SEARCH HISTORY FILE
-# =========================================================
-
 HISTORY_PATH = (
     Path(__file__).resolve().parents[1]
     / "data"
     / "search_history.csv"
 )
 
-
-# =========================================================
 # LOAD SEARCH HISTORY
-# =========================================================
 
 def load_search_history():
     """
@@ -55,9 +48,7 @@ def load_search_history():
     return history
 
 
-# =========================================================
 # GET RECENT SEARCHES
-# =========================================================
 
 def get_recent_searches(
     user_id,
@@ -74,17 +65,12 @@ def get_recent_searches(
 
     history = load_search_history()
 
-
     # No history available
     if history.empty:
 
         return []
-
-
-    # =====================================================
+    
     # FILTER CURRENT USER
-    # =====================================================
-
     user_history = history[
         history["user_id"].astype(str)
         ==
@@ -96,11 +82,7 @@ def get_recent_searches(
 
         return []
 
-
-    # =====================================================
     # SORT NEWEST FIRST
-    # =====================================================
-
     user_history = (
         user_history
 
@@ -131,10 +113,7 @@ def get_recent_searches(
     )
 
 
-# =========================================================
 # ADD SEARCH HISTORY
-# =========================================================
-
 def add_search_history(
     user_id,
     song
@@ -152,10 +131,7 @@ def add_search_history(
     history = load_search_history()
 
 
-    # =====================================================
     # REMOVE OLD COPY OF SAME SONG
-    # =====================================================
-
     if not history.empty:
 
         duplicate = (
@@ -213,9 +189,7 @@ def add_search_history(
         ]
 
 
-    # =====================================================
     # CREATE NEW SEARCH RECORD
-    # =====================================================
 
     new_search = pd.DataFrame(
         [
@@ -252,9 +226,7 @@ def add_search_history(
     )
 
 
-    # =====================================================
     # ADD NEW SEARCH
-    # =====================================================
 
     history = pd.concat(
         [
@@ -265,9 +237,7 @@ def add_search_history(
     )
 
 
-    # =====================================================
     # SAVE SEARCH HISTORY
-    # =====================================================
 
     history.to_csv(
         HISTORY_PATH,
@@ -275,9 +245,7 @@ def add_search_history(
     )
 
 
-# =========================================================
 # CLEAR SEARCH HISTORY
-# =========================================================
 
 def clear_search_history(
     user_id

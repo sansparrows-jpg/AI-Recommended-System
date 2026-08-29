@@ -1,14 +1,25 @@
 # SoundScope - Streamlit Main Application
 
 from pathlib import Path
+import json
+from urllib.parse import quote
+from urllib.request import Request, urlopen
 
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 
 from models.auth import authenticate, load_users, register_user
 from models.history import add_search_history, clear_search_history, get_recent_searches
 from models.preprocessing import preprocess_data
 from models.ratings import get_rating_count, get_song_rating, save_rating
+
+from spotify_auth import (
+    disconnect_spotify,
+    get_spotify_login_url,
+    handle_spotify_callback,
+    spotify_is_connected,
+)
 
 RECENT_SEARCH_LIMIT = 20
 
@@ -18,10 +29,11 @@ RATINGS_PATH = (
     / "real_user_ratings.csv"
 )
 
-
-# =========================================================
-# LUXURY MUSIC APPLICATION UI
-# =========================================================
+TRACKS_DATA_PATH = (
+    Path(__file__).resolve().parent
+    / "data"
+    / "spotify-tracks-dataset-detailed.csv"
+)
 
 def apply_luxury_ui():
     """
@@ -424,6 +436,257 @@ def apply_luxury_ui():
                 center !important;
         }
 
+
+        /* ================================================
+           SPOTIFY ALBUM COVER CARDS
+        ================================================ */
+
+        .stImage img {
+            border-radius: 12px !important;
+        }
+
+        .st-key-browse_results [data-testid="stImage"] img {
+            aspect-ratio: 1 / 1;
+            object-fit: contain;
+            background: rgba(10, 10, 18, 0.75);
+        }
+
+
+        /* ================================================
+           REFINED SONG CARDS
+        ================================================ */
+
+        .st-key-recommended_cards [data-testid="stVerticalBlockBorderWrapper"] {
+            min-height: 470px !important;
+            background:
+                linear-gradient(
+                    145deg,
+                    rgba(22, 21, 36, 0.96),
+                    rgba(12, 12, 22, 0.98)
+                ) !important;
+            border: 1px solid rgba(167, 139, 250, 0.18) !important;
+            border-radius: 16px !important;
+            overflow: hidden;
+        }
+
+        .st-key-recommended_cards [data-testid="stImage"] img {
+            width: 100% !important;
+            aspect-ratio: 1 / 1;
+            object-fit: cover !important;
+            border-radius: 13px !important;
+        }
+
+        .st-key-recommended_cards .stButton > button {
+            min-height: 42px !important;
+            justify-content: center !important;
+            text-align: center !important;
+        }
+
+        .st-key-recent_search_list [data-testid="stVerticalBlockBorderWrapper"],
+        .st-key-search_results_list [data-testid="stVerticalBlockBorderWrapper"] {
+            background: rgba(19, 19, 32, 0.94) !important;
+            border: 1px solid rgba(167, 139, 250, 0.12) !important;
+            border-radius: 12px !important;
+            padding: 0.35rem !important;
+        }
+
+        .st-key-recent_search_list [data-testid="stImage"] img,
+        .st-key-search_results_list [data-testid="stImage"] img {
+            width: 58px !important;
+            height: 58px !important;
+            object-fit: cover !important;
+            border-radius: 10px !important;
+        }
+
+        .st-key-recent_search_list .stButton > button,
+        .st-key-search_results_list .stButton > button {
+            background: transparent !important;
+            border: none !important;
+            min-height: 62px !important;
+            justify-content: flex-start !important;
+            text-align: left !important;
+            padding: 0.35rem 0.55rem !important;
+            box-shadow: none !important;
+        }
+
+        .st-key-recent_search_list .stButton > button:hover,
+        .st-key-search_results_list .stButton > button:hover {
+            background: rgba(139, 92, 246, 0.10) !important;
+            transform: none !important;
+            box-shadow: none !important;
+        }
+
+        .st-key-continue_listening [data-testid="stVerticalBlockBorderWrapper"] {
+            min-height: 185px !important;
+            background:
+                linear-gradient(
+                    145deg,
+                    rgba(22, 21, 36, 0.94),
+                    rgba(12, 12, 22, 0.97)
+                ) !important;
+            border: 1px solid rgba(167, 139, 250, 0.16) !important;
+            border-radius: 15px !important;
+        }
+
+        .st-key-continue_listening .stButton > button {
+            min-height: 42px !important;
+            justify-content: center !important;
+            text-align: center !important;
+        }
+
+
+        /* ================================================
+           LIKED SONGS - CONSISTENT MUSIC CARDS
+        ================================================ */
+
+        .st-key-liked_songs [data-testid="stVerticalBlockBorderWrapper"] {
+            min-height: 420px !important;
+            background:
+                linear-gradient(
+                    145deg,
+                    rgba(22, 21, 36, 0.96),
+                    rgba(12, 12, 22, 0.98)
+                ) !important;
+            border:
+                1px solid
+                rgba(167, 139, 250, 0.17)
+                !important;
+            border-radius:
+                16px !important;
+            overflow: visible !important;
+        }
+
+        .st-key-liked_songs [data-testid="stImage"] img {
+            width: 100% !important;
+            height: 255px !important;
+            object-fit: cover !important;
+            border-radius: 13px !important;
+        }
+
+        .st-key-liked_songs .stButton > button {
+            min-height: 42px !important;
+            text-align: center !important;
+            justify-content: center !important;
+        }
+
+
+        /* ================================================
+           SEARCH POPOVER - FIXED CONSISTENT WIDTH
+        ================================================ */
+
+        [data-testid="stPopoverBody"] {
+            width: min(820px, calc(100vw - 2rem)) !important;
+            max-width: min(820px, calc(100vw - 2rem)) !important;
+        }
+
+        .st-key-recent_search_list,
+        .st-key-search_results_list {
+            width: 100% !important;
+        }
+
+        .st-key-recent_search_list [data-testid="stVerticalBlockBorderWrapper"],
+        .st-key-search_results_list [data-testid="stVerticalBlockBorderWrapper"] {
+            min-height: 82px !important;
+            width: 100% !important;
+            background:
+                rgba(18, 18, 30, 0.94)
+                !important;
+            border:
+                1px solid
+                rgba(167, 139, 250, 0.14)
+                !important;
+            border-radius:
+                12px !important;
+            padding:
+                0.40rem 0.55rem !important;
+            overflow: hidden !important;
+        }
+
+        .st-key-recent_search_list [data-testid="stImage"] img,
+        .st-key-search_results_list [data-testid="stImage"] img {
+            width: 58px !important;
+            height: 58px !important;
+            object-fit: cover !important;
+            border-radius: 9px !important;
+        }
+
+        .st-key-recent_search_list .stButton > button,
+        .st-key-search_results_list .stButton > button {
+            min-height: 36px !important;
+            width: 100% !important;
+            padding: 0.25rem 0.70rem !important;
+            border-radius: 9px !important;
+            text-align: center !important;
+            justify-content: center !important;
+            background:
+                rgba(139, 92, 246, 0.14)
+                !important;
+            border:
+                1px solid
+                rgba(167, 139, 250, 0.18)
+                !important;
+        }
+
+        .st-key-recent_search_list .stButton > button:hover,
+        .st-key-search_results_list .stButton > button:hover {
+            background:
+                rgba(139, 92, 246, 0.25)
+                !important;
+            border-color:
+                rgba(214, 179, 106, 0.30)
+                !important;
+        }
+
+
+
+
+
+        /* ================================================
+           SEARCH 30-SECOND AUDIO PREVIEW
+        ================================================ */
+
+        .st-key-recent_search_list iframe,
+        .st-key-search_results_list iframe {
+            width: 100% !important;
+            border-radius: 12px !important;
+        }
+
+
+        /* ================================================
+           NOW PLAYING
+        ================================================ */
+
+        .st-key-now_playing [data-testid="stVerticalBlockBorderWrapper"] {
+            background:
+                linear-gradient(
+                    135deg,
+                    rgba(28, 26, 47, 0.97),
+                    rgba(12, 12, 22, 0.98)
+                ) !important;
+            border:
+                1px solid
+                rgba(167, 139, 250, 0.20)
+                !important;
+            border-radius:
+                18px !important;
+            padding:
+                0.65rem !important;
+            box-shadow:
+                0 14px 34px
+                rgba(0, 0, 0, 0.20);
+        }
+
+        .st-key-now_playing [data-testid="stImage"] img {
+            width: 100% !important;
+            aspect-ratio: 1 / 1;
+            object-fit: cover !important;
+            border-radius: 14px !important;
+        }
+
+        .st-key-now_playing iframe {
+            border-radius: 14px !important;
+        }
+
         @media (max-width: 800px) {
             .block-container {
                 padding-top: 4rem !important;
@@ -446,7 +709,6 @@ st.set_page_config(
 # Apply the luxury music application appearance.
 apply_luxury_ui()
 
-
 def init_session():
     defaults = {
         "logged_in": False,
@@ -457,8 +719,11 @@ def init_session():
     for key, value in defaults.items():
         st.session_state.setdefault(key, value)
 
-
 def logout():
+    # Spotify authorization belongs to the current
+    # SoundScope user session, so clear it on logout.
+    disconnect_spotify()
+
     keys_to_clear = [
         "selected_song",
         "selected_artist",
@@ -469,6 +734,7 @@ def logout():
         "final_results",
         "selected_song_details",
         "song_search_query",
+        "spotify_search_preview",
     ]
 
     st.session_state["logged_in"] = False
@@ -480,7 +746,6 @@ def logout():
         st.session_state.pop(key, None)
 
     st.rerun()
-
 
 def render_auth_page():
     st.title("SoundScope", anchor=False)
@@ -558,6 +823,441 @@ def render_auth_page():
                     else:
                         st.error(message)
 
+@st.cache_data(show_spinner=False)
+def load_track_id_lookup():
+    """
+    Load only the columns needed to match a SoundScope song
+    to its Spotify track_id.
+
+    This does not change the recommendation dataset.
+    It is used only for displaying album artwork.
+    """
+
+    if not TRACKS_DATA_PATH.exists():
+        return pd.DataFrame()
+
+    try:
+        lookup = pd.read_csv(
+            TRACKS_DATA_PATH,
+            usecols=[
+                "track_id",
+                "track_name",
+                "artists",
+                "popularity",
+            ],
+            dtype={
+                "track_id": str,
+                "track_name": str,
+                "artists": str,
+            },
+        ).fillna("")
+
+    except Exception:
+        return pd.DataFrame()
+
+    lookup["popularity"] = pd.to_numeric(
+        lookup["popularity"],
+        errors="coerce",
+    ).fillna(0)
+
+    lookup["track_key"] = (
+        lookup["track_name"]
+        .astype(str)
+        .str.strip()
+        .str.casefold()
+    )
+
+    lookup["artist_key"] = (
+        lookup["artists"]
+        .astype(str)
+        .str.strip()
+        .str.casefold()
+    )
+
+    # If duplicates exist, prefer the most popular Spotify track.
+    lookup = (
+        lookup
+        .sort_values(
+            "popularity",
+            ascending=False,
+        )
+        .drop_duplicates(
+            subset=[
+                "track_key",
+                "artist_key",
+            ]
+        )
+        .reset_index(drop=True)
+    )
+
+    return lookup
+
+def find_spotify_track_id(
+    track_name,
+    artist,
+):
+    """
+    Find the Spotify track_id for a displayed SoundScope song.
+    """
+
+    lookup = load_track_id_lookup()
+
+    if lookup.empty:
+        return None
+
+    track_key = (
+        str(track_name)
+        .strip()
+        .casefold()
+    )
+
+    artist_key = (
+        str(artist)
+        .strip()
+        .casefold()
+    )
+
+    # First try exact title + exact artist field.
+    exact = lookup[
+        lookup["track_key"].eq(
+            track_key
+        )
+        &
+        lookup["artist_key"].eq(
+            artist_key
+        )
+    ]
+
+    if not exact.empty:
+        return exact.iloc[0][
+            "track_id"
+        ]
+
+    # Fallback for multi-artist formatting differences.
+    same_title = lookup[
+        lookup["track_key"].eq(
+            track_key
+        )
+    ]
+
+    if same_title.empty:
+        return None
+
+    first_artist = (
+        artist_key
+        .split(";")[0]
+        .strip()
+    )
+
+    if first_artist:
+        artist_match = same_title[
+            same_title["artist_key"]
+            .str.contains(
+                first_artist,
+                regex=False,
+                na=False,
+            )
+        ]
+
+        if not artist_match.empty:
+            return artist_match.iloc[0][
+                "track_id"
+            ]
+
+    return same_title.iloc[0][
+        "track_id"
+    ]
+
+@st.cache_data(
+    ttl=86400,
+    show_spinner=False,
+)
+def get_spotify_oembed(
+    track_id,
+):
+    """
+    Retrieve Spotify preview metadata for one track.
+
+    Spotify oEmbed returns a thumbnail URL that can be
+    displayed as the track's album artwork.
+    """
+
+    if not track_id:
+        return None
+
+    spotify_url = (
+        "https://open.spotify.com/track/"
+        + str(track_id).strip()
+    )
+
+    endpoint = (
+        "https://open.spotify.com/oembed?url="
+        + quote(
+            spotify_url,
+            safe="",
+        )
+    )
+
+    request = Request(
+        endpoint,
+        headers={
+            "User-Agent":
+                "SoundScope-Music-Recommendation/1.0"
+        },
+    )
+
+    try:
+        with urlopen(
+            request,
+            timeout=6,
+        ) as response:
+            data = json.loads(
+                response.read()
+                .decode("utf-8")
+            )
+
+    except Exception:
+        return None
+
+    thumbnail_url = data.get(
+        "thumbnail_url"
+    )
+
+    if not thumbnail_url:
+        return None
+
+    return {
+        "image_url":
+            thumbnail_url,
+
+        # Spotify's official oEmbed player HTML.
+        "embed_html":
+            data.get(
+                "html",
+                "",
+            ),
+
+        "spotify_url":
+            spotify_url,
+
+        "title":
+            data.get(
+                "title",
+                "",
+            ),
+    }
+
+def get_song_cover(
+    track_name,
+    artist,
+):
+    """
+    Return Spotify album-cover information
+    for a SoundScope song.
+    """
+
+    track_id = find_spotify_track_id(
+        track_name,
+        artist,
+    )
+
+    if not track_id:
+        return None
+
+    return get_spotify_oembed(
+        track_id
+    )
+
+def render_song_cover(
+    track_name,
+    artist,
+    width="stretch",
+):
+    """
+    Display Spotify album artwork when available.
+
+    A music icon is used as a fallback if the network
+    is unavailable or the track cannot be matched.
+    """
+
+    cover = get_song_cover(
+        track_name,
+        artist,
+    )
+
+    if cover:
+        st.image(
+            cover["image_url"],
+            width=width,
+        )
+
+        return cover
+
+    st.markdown(
+        """
+        <div style="
+            min-height:120px;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            font-size:46px;
+            border-radius:14px;
+            background:
+                linear-gradient(
+                    135deg,
+                    rgba(110,69,215,0.30),
+                    rgba(214,179,106,0.12)
+                );
+        ">
+            🎵
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    return None
+
+def render_spotify_player(
+    track_name,
+    artist,
+):
+    """
+    Display Spotify's official embedded player
+    for the selected SoundScope song.
+
+    The audio is streamed by Spotify.
+    No audio file is copied into this project.
+    """
+
+    track_id = find_spotify_track_id(
+        track_name,
+        artist,
+    )
+
+    if not track_id:
+        st.info(
+            "Spotify playback is not available "
+            "for this song."
+        )
+        return
+
+    spotify_data = get_spotify_oembed(
+        track_id
+    )
+
+    if not spotify_data:
+        st.info(
+            "Spotify playback is not available "
+            "for this song."
+        )
+        return
+
+    embed_html = spotify_data.get(
+        "embed_html",
+        "",
+    )
+
+    # Fallback if Spotify oEmbed does not return HTML.
+    if not embed_html:
+        embed_url = (
+            "https://open.spotify.com/embed/track/"
+            + str(track_id).strip()
+        )
+
+        embed_html = f"""
+        <iframe
+            src="{embed_url}"
+            width="100%"
+            height="152"
+            frameborder="0"
+            allowfullscreen=""
+            allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+            loading="lazy">
+        </iframe>
+        """
+
+    components.html(
+        embed_html,
+        height=170,
+        scrolling=False,
+    )
+
+def render_now_playing():
+    """
+    Show the currently selected song together with
+    its album cover and Spotify embedded player.
+    """
+
+    song = st.session_state.get(
+        "selected_song_details"
+    )
+
+    if not song:
+        return
+
+    with st.container(
+        border=True,
+        key="now_playing",
+    ):
+        st.subheader(
+            "Now Playing"
+        )
+
+        cover_col, player_col = st.columns(
+            [0.9, 3.1],
+            vertical_alignment="center",
+        )
+
+        with cover_col:
+            cover = get_song_cover(
+                song["track_name"],
+                song["artists"],
+            )
+
+            if cover:
+                st.image(
+                    cover["image_url"],
+                    width="stretch",
+                )
+            else:
+                st.markdown(
+                    """
+                    <div style="
+                        width:100%;
+                        aspect-ratio:1/1;
+                        display:flex;
+                        align-items:center;
+                        justify-content:center;
+                        border-radius:14px;
+                        font-size:52px;
+                        background:
+                            linear-gradient(
+                                135deg,
+                                rgba(110,69,215,0.30),
+                                rgba(214,179,106,0.12)
+                            );
+                    ">
+                        🎵
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+
+        with player_col:
+            st.markdown(
+                f"### {song['track_name']}"
+            )
+
+            st.caption(
+                f"{song['artists']} · "
+                f"{song['track_genre']} · "
+                f"{song['mood']}"
+            )
+
+            render_spotify_player(
+                song["track_name"],
+                song["artists"],
+            )
 
 def fold_search_text(text):
     return "".join(
@@ -565,7 +1265,6 @@ def fold_search_text(text):
         for char in str(text).casefold()
         if char.isalnum() and char not in "aeiou"
     )
-
 
 @st.cache_data(show_spinner=False)
 def get_song_options():
@@ -592,7 +1291,6 @@ def get_song_options():
 
     return songs, search_songs
 
-
 def get_user_count():
     """Count normal users only; admin accounts are excluded."""
     users = load_users()
@@ -607,7 +1305,6 @@ def get_user_count():
         .eq("user")
         .sum()
     )
-
 
 def filter_song_options(query, search_songs, limit=10):
     query = query.strip().casefold()
@@ -645,7 +1342,6 @@ def filter_song_options(query, search_songs, limit=10):
         .head(limit)
         .to_dict("records")
     )
-
 
 def generate_recommendations(song_name, artist, user_id):
     from models.collaborative import recommend_for_user
@@ -693,7 +1389,6 @@ def generate_recommendations(song_name, artist, user_id):
             "final_results": final_results,
         }
 
-
 def handle_song_selection(song, user_id):
     st.session_state["selected_song_details"] = {
         "track_name": song["track_name"],
@@ -712,7 +1407,6 @@ def handle_song_selection(song, user_id):
         )
 
     st.toast("Recommendations generated successfully.", icon="🎧")
-
 
 def render_top_10(final_results):
     st.subheader("Top 10 recommended songs")
@@ -742,13 +1436,285 @@ def render_top_10(final_results):
         height=390,
     )
 
+def render_spotify_30_second_embed(
+    track_name,
+    artist,
+):
+    """
+    Render Spotify's official embedded track player and
+    automatically stop playback after 30 seconds.
+
+    This uses the exact Spotify track_id from the dataset.
+    It does not depend on Spotify's deprecated preview_url.
+    """
+
+    track_id = find_spotify_track_id(
+        track_name,
+        artist,
+    )
+
+    if not track_id:
+        st.info(
+            "Spotify playback is not available "
+            "for this song."
+        )
+        return
+
+    # Every Streamlit component is isolated in its own iframe,
+    # so this HTML can safely create one Spotify player.
+    player_id = (
+        "spotify_player_"
+        + "".join(
+            char
+            for char in str(track_id)
+            if char.isalnum()
+        )
+    )
+
+    spotify_uri = (
+        "spotify:track:"
+        + str(track_id).strip()
+    )
+
+    preview_html = f"""
+    <div
+        id="{player_id}"
+        style="
+            width:100%;
+            min-height:82px;
+        ">
+    </div>
+
+    <script
+        src="https://open.spotify.com/embed/iframe-api/v1"
+        async>
+    </script>
+
+    <script>
+        window.onSpotifyIframeApiReady = (IFrameAPI) => {{
+            const element = document.getElementById(
+                "{player_id}"
+            );
+
+            const options = {{
+                width: "100%",
+                height: 80,
+                uri: "{spotify_uri}",
+                theme: "dark"
+            }};
+
+            const callback = (EmbedController) => {{
+                let hasStoppedAtThirty = false;
+
+                EmbedController.addListener(
+                    "playback_update",
+                    (event) => {{
+                        const state = event.data;
+
+                        if (
+                            !hasStoppedAtThirty &&
+                            !state.isPaused &&
+                            state.position >= 30000
+                        ) {{
+                            hasStoppedAtThirty = true;
+
+                            EmbedController.pause();
+
+                            // Return to the start so the next
+                            // play gives another 30-second sample.
+                            setTimeout(
+                                () => {{
+                                    EmbedController.seek(0);
+                                    hasStoppedAtThirty = false;
+                                }},
+                                250
+                            );
+                        }}
+
+                        if (
+                            state.position < 30000 &&
+                            state.isPaused
+                        ) {{
+                            hasStoppedAtThirty = false;
+                        }}
+                    }}
+                );
+            }};
+
+            IFrameAPI.createController(
+                element,
+                options,
+                callback
+            );
+        }};
+    </script>
+    """
+
+    components.html(
+        preview_html,
+        height=92,
+        scrolling=False,
+    )
+
+def render_search_song_row(
+    song,
+    user_id,
+    button_key,
+):
+    """
+    Display one compact song row with:
+    - album artwork
+    - song information
+    - Spotify 30-second player
+    - Open button
+
+    Recent Searches and Search Results share this
+    same component so both layouts stay consistent.
+    """
+
+    track_name = str(
+        song["track_name"]
+    )
+
+    artist = str(
+        song["artists"]
+    )
+
+    genre = str(
+        song["track_genre"]
+    )
+
+    mood = str(
+        song["mood"]
+    )
+
+    preview_state_key = (
+        "spotify_search_preview"
+    )
+
+    this_preview_key = (
+        f"preview_{button_key}"
+    )
+
+    with st.container(
+        border=True
+    ):
+        (
+            image_col,
+            details_col,
+            preview_col,
+            action_col,
+        ) = st.columns(
+            [0.75, 3.55, 0.95, 0.85],
+            vertical_alignment="center",
+        )
+
+        # Album artwork
+        with image_col:
+            cover = get_song_cover(
+                track_name,
+                artist,
+            )
+
+            if cover:
+                st.image(
+                    cover["image_url"],
+                    width=58,
+                )
+            else:
+                st.markdown(
+                    """
+                    <div style="
+                        width:58px;
+                        height:58px;
+                        display:flex;
+                        align-items:center;
+                        justify-content:center;
+                        border-radius:9px;
+                        font-size:27px;
+                        background:rgba(139,92,246,0.16);
+                    ">
+                        🎵
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+
+        # Song information
+        with details_col:
+            st.markdown(
+                f"**{track_name}**"
+            )
+
+            st.caption(
+                f"{artist} · {genre} · {mood}"
+            )
+
+        # Show / hide Spotify player.
+        with preview_col:
+            preview_is_open = (
+                st.session_state.get(
+                    preview_state_key
+                )
+                == this_preview_key
+            )
+
+            preview_label = (
+                "Hide"
+                if preview_is_open
+                else "▶ 30s"
+            )
+
+            if st.button(
+                preview_label,
+                key=(
+                    f"{this_preview_key}_button"
+                ),
+                width="stretch",
+            ):
+                if preview_is_open:
+                    st.session_state.pop(
+                        preview_state_key,
+                        None,
+                    )
+                else:
+                    st.session_state[
+                        preview_state_key
+                    ] = this_preview_key
+
+                st.rerun()
+
+        # Keep the existing recommendation action.
+        with action_col:
+            if st.button(
+                "Open",
+                key=button_key,
+                width="stretch",
+            ):
+                handle_song_selection(
+                    song,
+                    user_id,
+                )
+
+        # Spotify player appears inside this same frame.
+        if (
+            st.session_state.get(
+                preview_state_key
+            )
+            == this_preview_key
+        ):
+            st.caption(
+                "Spotify preview · automatically stops at 30 seconds"
+            )
+
+            render_spotify_30_second_embed(
+                track_name,
+                artist,
+            )
 
 def render_recent_searches(user_id):
     """
-    Show the logged-in user's recent searches.
-
-    This function is displayed inside the top Search popover,
-    so Recent Searches only appear after the user opens Search.
+    Show recent searches inside the Search popover.
     """
 
     recent_searches = get_recent_searches(
@@ -756,11 +1722,15 @@ def render_recent_searches(user_id):
         limit=RECENT_SEARCH_LIMIT,
     )
 
-    title_col, clear_col = st.columns([4, 1])
+    title_col, clear_col = st.columns(
+        [4.8, 1]
+    )
 
     with title_col:
         st.markdown("#### Recent searches")
-        st.caption("Continue from a song you selected earlier.")
+        st.caption(
+            "Continue from a song you selected earlier."
+        )
 
     with clear_col:
         if recent_searches and st.button(
@@ -768,7 +1738,9 @@ def render_recent_searches(user_id):
             key="clear_history",
             width="stretch",
         ):
-            clear_search_history(user_id)
+            clear_search_history(
+                user_id
+            )
             st.rerun()
 
     if not recent_searches:
@@ -778,44 +1750,43 @@ def render_recent_searches(user_id):
         )
         return
 
-    # Keep every recent-search record available,
-    # but scroll inside the dropdown instead of the whole page.
     with st.container(
-        height=360,
+        height=405,
+        width=800,
         key="recent_search_list",
     ):
-        for index, song in enumerate(recent_searches):
+        for index, song in enumerate(
+            recent_searches
+        ):
             normal_song = {
-                "track_name": song["track_name"],
-                "artists": song["artist"],
-                "track_genre": song["genre"],
-                "mood": song["mood"],
+                "track_name":
+                    song["track_name"],
+
+                "artists":
+                    song["artist"],
+
+                "track_genre":
+                    song["genre"],
+
+                "mood":
+                    song["mood"],
             }
 
-            label = (
-                f"♫  {song['track_name']}  —  {song['artist']}"
-                f"   ·   {song['genre']}   ·   {song['mood']}"
+            render_search_song_row(
+                normal_song,
+                user_id,
+                button_key=(
+                    f"recent_song_{index}"
+                ),
             )
-
-            if st.button(
-                label,
-                key=f"recent_song_{index}",
-                width="stretch",
-            ):
-                handle_song_selection(
-                    normal_song,
-                    user_id,
-                )
-
-
 
 def render_collaborative_for_you(user_id):
     """
     Show personalized Collaborative recommendations
-    in one horizontally scrollable row.
+    in a clean horizontally scrollable card row.
 
-    The Collaborative score and explanation are used
-    internally but are hidden from normal users.
+    Scores and technical explanations remain hidden
+    from normal users.
     """
 
     from models.collaborative import (
@@ -830,10 +1801,15 @@ def render_collaborative_for_you(user_id):
         "Swipe or scroll left and right to view more songs."
     )
 
-    rating_count = get_rating_count(user_id)
+    rating_count = get_rating_count(
+        user_id
+    )
 
     if rating_count < MIN_USER_RATINGS:
-        remaining = MIN_USER_RATINGS - rating_count
+        remaining = (
+            MIN_USER_RATINGS
+            - rating_count
+        )
 
         st.info(
             f"Rate {remaining} more song(s) to unlock "
@@ -858,26 +1834,71 @@ def render_collaborative_for_you(user_id):
         if len(value) <= limit:
             return value
 
-        return value[: limit - 1] + "…"
+        return (
+            value[: limit - 1]
+            + "…"
+        )
 
     with st.container(
         horizontal=True,
         wrap=False,
         gap="small",
+        key="recommended_cards",
     ):
-        for index, song in enumerate(recommendations):
+        for index, song in enumerate(
+            recommendations
+        ):
             normal_song = {
-                "track_name": song["track_name"],
-                "artists": song["artist"],
-                "track_genre": song["genre"],
-                "mood": song["mood"],
+                "track_name":
+                    song["track_name"],
+
+                "artists":
+                    song["artist"],
+
+                "track_genre":
+                    song["genre"],
+
+                "mood":
+                    song["mood"],
             }
 
             with st.container(
                 border=True,
-                width=240,
+                width=245,
             ):
-                st.markdown("### 🎵")
+                cover = get_song_cover(
+                    song["track_name"],
+                    song["artist"],
+                )
+
+                if cover:
+                    st.image(
+                        cover["image_url"],
+                        width="stretch",
+                    )
+                else:
+                    st.markdown(
+                        """
+                        <div style="
+                            width:100%;
+                            aspect-ratio:1/1;
+                            display:flex;
+                            align-items:center;
+                            justify-content:center;
+                            border-radius:14px;
+                            font-size:52px;
+                            background:
+                                linear-gradient(
+                                    135deg,
+                                    rgba(110,69,215,0.30),
+                                    rgba(214,179,106,0.12)
+                                );
+                        ">
+                            🎵
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
 
                 st.markdown(
                     f"**{shorten(song['track_name'], 25)}**"
@@ -886,18 +1907,17 @@ def render_collaborative_for_you(user_id):
                 st.caption(
                     shorten(
                         song["artist"],
-                        28,
+                        27,
                     )
                 )
 
                 st.caption(
-                    f"{song['genre']} · {song['mood']}"
+                    f"{song['genre']} · "
+                    f"{song['mood']}"
                 )
 
-                # Collaborative score and explanation are intentionally
-                # hidden from normal users. Admin can inspect them
-                # on the Results / Admin Review pages.
-
+                # Recommendation scores are intentionally
+                # hidden from normal users.
                 if st.button(
                     "Select song",
                     key=f"personalized_song_{index}",
@@ -907,8 +1927,6 @@ def render_collaborative_for_you(user_id):
                         normal_song,
                         user_id,
                     )
-
-
 
 def load_current_user_ratings(user_id):
     """
@@ -952,8 +1970,6 @@ def load_current_user_ratings(user_id):
         )
 
     return user_ratings.reset_index(drop=True)
-
-
 
 def get_user_taste_profile(user_id):
     """
@@ -1027,11 +2043,10 @@ def get_user_taste_profile(user_id):
 
     return profile
 
-
 def render_continue_listening(user_id):
     """
-    Show a clean Continue Listening row using
-    the user's latest selected songs.
+    Show the user's latest selected songs as compact,
+    balanced Continue Listening cards.
     """
 
     recent = get_recent_searches(
@@ -1051,28 +2066,61 @@ def render_continue_listening(user_id):
         len(recent)
     )
 
-    for index, song in enumerate(recent):
+    for index, song in enumerate(
+        recent
+    ):
         normal_song = {
-            "track_name": song["track_name"],
-            "artists": song["artist"],
-            "track_genre": song["genre"],
-            "mood": song["mood"],
+            "track_name":
+                song["track_name"],
+
+            "artists":
+                song["artist"],
+
+            "track_genre":
+                song["genre"],
+
+            "mood":
+                song["mood"],
         }
 
         with columns[index]:
             with st.container(
                 border=True
             ):
-                icon_col, details_col = st.columns(
-                    [0.55, 2.45],
+                image_col, details_col = st.columns(
+                    [0.85, 2.4],
                     vertical_alignment="center",
                 )
 
-                with icon_col:
-                    st.markdown(
-                        "<div style='font-size:42px; text-align:center;'>🎵</div>",
-                        unsafe_allow_html=True,
+                with image_col:
+                    cover = get_song_cover(
+                        song["track_name"],
+                        song["artist"],
                     )
+
+                    if cover:
+                        st.image(
+                            cover["image_url"],
+                            width=72,
+                        )
+                    else:
+                        st.markdown(
+                            """
+                            <div style="
+                                width:72px;
+                                height:72px;
+                                display:flex;
+                                align-items:center;
+                                justify-content:center;
+                                border-radius:12px;
+                                font-size:34px;
+                                background:rgba(139,92,246,0.18);
+                            ">
+                                🎵
+                            </div>
+                            """,
+                            unsafe_allow_html=True,
+                        )
 
                 with details_col:
                     track_name = str(
@@ -1083,15 +2131,15 @@ def render_continue_listening(user_id):
                         song["artist"]
                     )
 
-                    if len(track_name) > 27:
+                    if len(track_name) > 25:
                         track_name = (
-                            track_name[:26]
+                            track_name[:24]
                             + "…"
                         )
 
-                    if len(artist) > 25:
+                    if len(artist) > 23:
                         artist = (
-                            artist[:24]
+                            artist[:22]
                             + "…"
                         )
 
@@ -1104,7 +2152,8 @@ def render_continue_listening(user_id):
                     )
 
                     st.caption(
-                        f"{song['genre']} · {song['mood']}"
+                        f"{song['genre']} · "
+                        f"{song['mood']}"
                     )
 
                 if st.button(
@@ -1116,8 +2165,6 @@ def render_continue_listening(user_id):
                         normal_song,
                         user_id,
                     )
-
-
 
 def render_browse_music(
     user_id,
@@ -1366,17 +2413,10 @@ def render_browse_music(
                     with st.container(
                         border=True
                     ):
-                        # Music icon area
-                        st.markdown(
-                            """
-                            <div style="
-                                font-size: 36px;
-                                margin-bottom: 8px;
-                            ">
-                                🎵
-                            </div>
-                            """,
-                            unsafe_allow_html=True,
+                        # Spotify album artwork.
+                        cover = render_song_cover(
+                            song["track_name"],
+                            song["artists"],
                         )
 
                         # Song information
@@ -1407,8 +2447,6 @@ def render_browse_music(
                                 song,
                                 user_id,
                             )
-
-
 
 def render_user_ratings(user_id):
     """
@@ -1545,43 +2583,137 @@ def render_user_ratings(user_id):
                     with st.container(
                         key="liked_songs"
                     ):
-                        liked_columns = st.columns(3)
-
-                        for index, row in enumerate(
+                        liked_records = (
                             liked_songs
-                            .head(9)
+                            .head(8)
                             .to_dict("records")
+                        )
+
+                        # Four equal cards per row keeps the
+                        # library compact and consistent.
+                        for row_start in range(
+                            0,
+                            len(liked_records),
+                            4,
                         ):
-                            normal_song = {
-                                "track_name":
-                                    row["track_name"],
+                            row_records = liked_records[
+                                row_start:
+                                row_start + 4
+                            ]
 
-                                "artists":
-                                    row["artist"],
+                            liked_columns = st.columns(
+                                4
+                            )
 
-                                "track_genre":
-                                    row["genre"],
+                            for offset, row in enumerate(
+                                row_records
+                            ):
+                                index = (
+                                    row_start
+                                    + offset
+                                )
 
-                                "mood":
-                                    row["mood"],
-                            }
+                                normal_song = {
+                                    "track_name":
+                                        row["track_name"],
 
-                            with liked_columns[
-                                index % 3
-                            ]:
-                                if st.button(
-                                    (
-                                        f"♥ {row['track_name']}"
-                                        f"\n\n{row['artist']} "
-                                        f"· {int(row['rating'])} ★"
-                                    ),
-                                    key=f"liked_song_{index}",
-                                    width="stretch",
-                                ):
-                                    handle_song_selection(
-                                        normal_song,
-                                        user_id,
-                                    )
+                                    "artists":
+                                        row["artist"],
+
+                                    "track_genre":
+                                        row["genre"],
+
+                                    "mood":
+                                        row["mood"],
+                                }
+
+                                with liked_columns[
+                                    offset
+                                ]:
+                                    with st.container(
+                                        border=True
+                                    ):
+                                        liked_cover = get_song_cover(
+                                            row["track_name"],
+                                            row["artist"],
+                                        )
+
+                                        if liked_cover:
+                                            st.image(
+                                                liked_cover[
+                                                    "image_url"
+                                                ],
+                                                width="stretch",
+                                            )
+                                        else:
+                                            st.markdown(
+                                                """
+                                                <div style="
+                                                    width:100%;
+                                                    height:255px;
+                                                    display:flex;
+                                                    align-items:center;
+                                                    justify-content:center;
+                                                    border-radius:13px;
+                                                    font-size:48px;
+                                                    background:
+                                                        linear-gradient(
+                                                            135deg,
+                                                            rgba(110,69,215,0.30),
+                                                            rgba(214,179,106,0.12)
+                                                        );
+                                                ">
+                                                    🎵
+                                                </div>
+                                                """,
+                                                unsafe_allow_html=True,
+                                            )
+
+                                        track_name = str(
+                                            row["track_name"]
+                                        )
+
+                                        artist = str(
+                                            row["artist"]
+                                        )
+
+                                        if len(track_name) > 24:
+                                            track_name = (
+                                                track_name[:23]
+                                                + "…"
+                                            )
+
+                                        if len(artist) > 25:
+                                            artist = (
+                                                artist[:24]
+                                                + "…"
+                                            )
+
+                                        st.markdown(
+                                            f"**♥ {track_name}**"
+                                        )
+
+                                        st.caption(
+                                            artist
+                                        )
+
+                                        st.caption(
+                                            f"{row['genre']} · "
+                                            f"{row['mood']} · "
+                                            f"{int(row['rating'])} ★"
+                                        )
+
+                                        if st.button(
+                                            "Open song",
+                                            key=(
+                                                f"liked_song_{index}"
+                                            ),
+                                            width="stretch",
+                                        ):
+                                            handle_song_selection(
+                                                normal_song,
+                                                user_id,
+                                            )
 
             # -------------------------------------------------
             # ALL RATINGS
@@ -1618,11 +2750,16 @@ def render_user_ratings(user_id):
                     height=390,
                 )
 
-
-
-def render_search_results(query, search_songs, user_id):
+def render_search_results(
+    query,
+    search_songs,
+    user_id,
+):
     """
-    Show song matches inside the Search popover.
+    Show matching songs inside the Search popover.
+
+    Search Results use the same row component as
+    Recent Searches so both have equal frame sizes.
     """
 
     matches = filter_song_options(
@@ -1632,7 +2769,9 @@ def render_search_results(query, search_songs, user_id):
     )
 
     st.markdown("#### Search results")
-    st.caption(f"Top matches for '{query}'")
+    st.caption(
+        f"Top matches for '{query}'"
+    )
 
     if not matches:
         st.warning(
@@ -1642,26 +2781,20 @@ def render_search_results(query, search_songs, user_id):
         return
 
     with st.container(
-        height=400,
+        height=405,
+        width=800,
         key="search_results_list",
     ):
-        for index, song in enumerate(matches):
-            label = (
-                f"♫  {song['track_name']}  —  {song['artists']}"
-                f"   ·   {song['track_genre']}   ·   {song['mood']}"
+        for index, song in enumerate(
+            matches
+        ):
+            render_search_song_row(
+                song,
+                user_id,
+                button_key=(
+                    f"search_song_{index}"
+                ),
             )
-
-            if st.button(
-                label,
-                key=f"search_song_{index}",
-                width="stretch",
-            ):
-                handle_song_selection(
-                    song,
-                    user_id,
-                )
-
-
 
 def render_rating_section(user_id):
     song = st.session_state.get("selected_song_details")
@@ -1712,7 +2845,6 @@ def render_rating_section(user_id):
         rating_count = get_rating_count(user_id)
         label = "song" if rating_count == 1 else "songs"
         st.caption(f"You have rated {rating_count} {label}.")
-
 
 def render_discover_page():
     """
@@ -1781,6 +2913,36 @@ def render_discover_page():
         )
 
         st.caption(role_label)
+
+        # Spotify Premium connection used by the
+        # Web Playback SDK.
+        if spotify_is_connected():
+            st.caption("Spotify · Connected")
+
+            if st.button(
+                "Disconnect Spotify",
+                key="disconnect_spotify",
+                width="stretch",
+            ):
+                disconnect_spotify()
+                st.rerun()
+
+        else:
+            try:
+                spotify_login_url = (
+                    get_spotify_login_url()
+                )
+
+                st.link_button(
+                    "Connect Spotify",
+                    spotify_login_url,
+                    width="stretch",
+                )
+
+            except Exception as error:
+                st.caption(
+                    "Spotify configuration is missing."
+                )
 
         if st.button(
             "Logout",
@@ -1866,6 +3028,12 @@ def render_discover_page():
     if final_results:
         st.space("small")
 
+        # Play the selected song using Spotify's official
+        # embedded player.
+        render_now_playing()
+
+        st.space("small")
+
         result_col, rating_col = st.columns(
             [2.5, 1],
             vertical_alignment="top",
@@ -1912,8 +3080,6 @@ def render_discover_page():
             user_id
         )
 
-
-
 def run_navigation():
     discover_page = st.Page(
         render_discover_page,
@@ -1939,16 +3105,34 @@ def run_navigation():
 
     navigation.run()
 
-
 def main():
     init_session()
+
+    # Handle Spotify's OAuth redirect before rendering
+    # the normal SoundScope pages.
+    spotify_callback = handle_spotify_callback()
+
+    if spotify_callback == "connected":
+        st.toast(
+            "Spotify connected successfully.",
+            icon="✅",
+        )
+
+    elif spotify_callback == "error":
+        error_message = st.session_state.get(
+            "spotify_auth_error",
+            "Spotify connection failed.",
+        )
+
+        st.error(
+            f"Spotify connection failed: {error_message}"
+        )
 
     if not st.session_state["logged_in"]:
         render_auth_page()
         return
 
     run_navigation()
-
 
 if __name__ == "__main__":
     main()
