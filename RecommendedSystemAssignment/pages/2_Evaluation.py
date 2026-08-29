@@ -312,52 +312,96 @@ st.caption(
 
 
 # =========================================================
+# TOP EVALUATION SUMMARY
+# =========================================================
+
+content_summary_col, evaluation_method_col = st.columns(
+    [1, 1],
+    vertical_alignment="top"
+)
+
+
+# =========================================================
+# CONTENT-BASED EVALUATION SUMMARY
+# =========================================================
+
+with content_summary_col:
+
+    st.subheader(
+        "Content-Based Evaluation Summary",
+        anchor=False
+    )
+
+    with st.container(border=True):
+
+        st.metric(
+            "Average Similarity Score",
+            f"{content.get('similarity', 0):.3f}"
+        )
+
+        st.write(
+            "The similarity score measures how closely the "
+            "recommended songs match the selected seed song "
+            "based on text and audio features."
+        )
+
+        st.info(
+            "User questionnaire results can be added after "
+            "5 to 10 users have evaluated the relevance of "
+            "the Content-Based recommendations using the "
+            "5-point Likert scale."
+        )
+
+
+# =========================================================
 # EVALUATION METHOD
 # =========================================================
 
-with st.container(border=True):
+with evaluation_method_col:
 
     st.subheader(
         "Evaluation Method",
         anchor=False
     )
 
-    col1, col2, col3 = st.columns(3)
+    with st.container(border=True):
 
-    col1.metric(
-        "Users Evaluated",
-        user_count
-    )
+        col1, col2, col3 = st.columns(3)
 
-    col2.metric(
-        "Recommendation Size",
-        "Top 10"
-    )
-
-    col3.metric(
-        "Relevant Rating",
-        "4 - 5"
-    )
-
-    st.write(
-        "Collaborative and Hybrid recommendations are "
-        "evaluated using real-user hold-out testing. "
-        "Songs that users rated 4 or 5 are temporarily "
-        "hidden and used as relevant test songs."
-    )
-
-    st.write(
-        "Content-Based Filtering is evaluated separately "
-        "using the similarity of its recommendations and "
-        "a user questionnaire because it recommends songs "
-        "based on similarity to a selected seed song."
-    )
-
-    if evaluation_users:
-        st.caption(
-            "Evaluation users: "
-            + ", ".join(evaluation_users)
+        col1.metric(
+            "Users Evaluated",
+            user_count
         )
+
+        col2.metric(
+            "Recommendation Size",
+            "Top 10"
+        )
+
+        col3.metric(
+            "Relevant Rating",
+            "4 - 5"
+        )
+
+        st.write(
+            "Collaborative and Hybrid recommendations are "
+            "evaluated using real-user hold-out testing. "
+            "Songs that users rated 4 or 5 are temporarily "
+            "hidden and used as relevant test songs."
+        )
+
+        st.write(
+            "Content-Based Filtering is evaluated separately "
+            "using the similarity of its recommendations and "
+            "a user questionnaire because it recommends songs "
+            "based on similarity to a selected seed song."
+        )
+
+        if evaluation_users:
+            st.caption(
+                "Evaluation users: "
+                + ", ".join(evaluation_users)
+            )
 
 
 # =========================================================
@@ -656,37 +700,6 @@ else:
         f"{names} achieved the same highest "
         f"F1 Score of {best_score:.3f}.",
         icon=":material/check_circle:"
-    )
-
-
-# =========================================================
-# CONTENT-BASED EVALUATION SUMMARY
-# =========================================================
-
-st.subheader(
-    "Content-Based Evaluation Summary",
-    anchor=False
-)
-
-
-with st.container(border=True):
-
-    st.metric(
-        "Average Similarity Score",
-        f"{content.get('similarity', 0):.3f}"
-    )
-
-    st.write(
-        "The similarity score measures how closely the "
-        "recommended songs match the selected seed song "
-        "based on text and audio features."
-    )
-
-    st.info(
-        "User questionnaire results can be added after "
-        "5 to 10 users have evaluated the relevance of "
-        "the Content-Based recommendations using the "
-        "5-point Likert scale."
     )
 
 

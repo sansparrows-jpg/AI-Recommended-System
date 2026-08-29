@@ -1,19 +1,7 @@
-# COLLABORATIVE FILTERING
-#
-# Real ratings:
-# data/real_user_ratings.csv
-#
-# Algorithms:
-# 1. User-Based KNN
-# 2. Item-Based KNN
-#
-# Distance:
-# Euclidean Distance
-#
-# K = 5
-#
-# Final Score:
-# 50% User-Based + 50% Item-Based
+# Collaborative Filtering using real user ratings.
+# User-Based KNN + Item-Based KNN, K = 5.
+# Euclidean Distance is converted to similarity.
+# Final score = 50% User-Based + 50% Item-Based.
 
 import math
 
@@ -27,7 +15,7 @@ from models.real_user_data import (
 from models.ratings import get_rating_count
 
 
-# CONFIGURATION
+# Configuration values used by both KNN methods.
 
 K_NEIGHBORS = 5
 MIN_RECOMMEND_RATING = 4
@@ -37,7 +25,7 @@ USER_WEIGHT = 0.5
 ITEM_WEIGHT = 0.5
 
 
-# SPOTIFY POPULARITY LOOKUP
+# Build a lookup for Spotify popularity values.
 
 spotify_songs = preprocess_data()
 
@@ -57,7 +45,7 @@ for _, row in spotify_songs.iterrows():
         )
 
 
-# BASIC HELPERS
+# Helper functions for IDs, similarity and song metadata.
 
 def distance_to_similarity(distance):
     """Convert Euclidean Distance to similarity."""
@@ -162,7 +150,7 @@ def get_recommendation_source(
     return "None"
 
 
-# USER-BASED KNN
+# User-Based KNN: compare users with common song ratings.
 def calculate_user_distance(
     user_a,
     user_b,
@@ -391,7 +379,7 @@ def user_based_recommendations(
     return results[:top_n]
 
 
-# ITEM-BASED KNN
+# Item-Based KNN: compare songs using common user ratings.
 
 def calculate_item_distance(
     song_a,
@@ -570,7 +558,7 @@ def item_based_recommendations(
     return results[:top_n]
 
 
-# USER SIMILARITY EXPLANATION
+# Explain why two users are considered similar.
 
 def get_user_similarity_details(
     user_id,
@@ -720,7 +708,7 @@ def get_nearest_users_explanation(
     return explanations
 
 
-# USER-BASED RECOMMENDATION EXPLANATION
+# Explain which similar users support a recommendation.
 
 def get_recommendation_support(
     user_id,
@@ -813,7 +801,7 @@ def get_recommendation_support(
     }
 
 
-# ITEM-BASED RECOMMENDATION EXPLANATION
+# Explain which liked songs support an Item-Based recommendation.
 
 def get_item_recommendation_support(
     user_id,
@@ -949,7 +937,7 @@ def get_item_recommendation_support(
     }
 
 
-# FINAL COLLABORATIVE FILTERING
+# Combine User-Based and Item-Based KNN into the final score.
 
 def recommend_for_user(
     user_id,
@@ -996,7 +984,7 @@ def recommend_for_user(
 
     combined = {}
 
-    # USER-BASED RESULTS
+    # Add User-Based recommendation scores.
 
     for song in user_results:
 
@@ -1015,7 +1003,7 @@ def recommend_for_user(
                 ),
         }
 
-    # ITEM-BASED RESULTS
+    # Merge Item-Based recommendation scores.
 
     for song in item_results:
 
@@ -1042,7 +1030,7 @@ def recommend_for_user(
                 "item_knn_score"
             ] = song["item_knn_score"]
 
-    # FINAL 50/50 SCORE
+    # Calculate the final 50/50 Collaborative score.
 
     results = []
 
@@ -1110,12 +1098,7 @@ def recommend_for_user(
                 ),
         })
 
-    # STABLE FINAL RANKING
-    #
-    # 1. Collaborative score
-    # 2. User-Based score
-    # 3. Item-Based score
-    # 4. Track name / artist for equal-score ties
+    # Sort recommendations consistently when scores are tied.
 
     results.sort(
         key=lambda song: (
@@ -1130,7 +1113,7 @@ def recommend_for_user(
     return results[:top_n]
 
 
-# TEST
+# Simple command-line test for the Collaborative Filtering module.
 
 if __name__ == "__main__":
 
@@ -1151,7 +1134,7 @@ if __name__ == "__main__":
         get_rating_count(TEST_USER)
     )
 
-    # NEAREST USERS
+    # Display the nearest users for testing.
 
     print()
     print("=" * 55)
@@ -1171,7 +1154,7 @@ if __name__ == "__main__":
             f"Common: {neighbour['common_ratings']}"
         )
 
-    # FINAL RECOMMENDATIONS
+    # Display the final Collaborative recommendations for testing.
 
     print()
     print("=" * 55)
