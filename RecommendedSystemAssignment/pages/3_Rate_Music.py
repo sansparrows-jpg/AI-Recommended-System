@@ -279,7 +279,7 @@ def load_available_users():
     First try to get users from data/users.csv.
 
     If data/users.csv is not available,
-    user IDs are loaded from data/user_ratings.csv.
+    user IDs are loaded from data/real_user_ratings.csv.
     """
     user_ids = set()
     if USERS_FILE.exists():
