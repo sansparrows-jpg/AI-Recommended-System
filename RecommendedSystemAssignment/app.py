@@ -36,29 +36,26 @@ TRACKS_DATA_PATH = (
 )
 
 
-def is_local_spotify_environment():
+def is_streamlit_cloud():
     """
-    Return True only when Spotify OAuth is configured
-    for localhost or 127.0.0.1.
+    Return True when SoundScope is opened from
+    the deployed Streamlit Cloud website.
 
-    This keeps the Connect Spotify button available
-    during local development but hides it on deployment.
+    Local development can use localhost, 127.0.0.1,
+    or a local network address such as 192.168.x.x.
     """
 
     try:
-        redirect_uri = str(
-            st.secrets.get(
-                "SPOTIFY_REDIRECT_URI",
-                "",
-            )
+        current_url = str(
+            st.context.url
         ).strip().casefold()
 
     except Exception:
         return False
 
     return (
-        "127.0.0.1" in redirect_uri
-        or "localhost" in redirect_uri
+        ".streamlit.app"
+        in current_url
     )
 
 
@@ -2941,9 +2938,10 @@ def render_discover_page():
 
         st.caption(role_label)
 
-        # Show Spotify account connection only on localhost.
-        # Deployed users can still use the embedded Spotify players.
-        if is_local_spotify_environment():
+        # Show Spotify account connection only on the local version.
+        # Streamlit Cloud keeps album covers and embedded Spotify players,
+        # but hides the account connection button.
+        if not is_streamlit_cloud():
             if spotify_is_connected():
                 st.caption("Spotify · Connected")
 
@@ -3086,8 +3084,7 @@ def render_discover_page():
         if role == "admin":
             st.caption(
                 "Use the sidebar to open Results, "
-                "Evaluation, Rate Music, User Data, "
-                "and User Data."
+                "Evaluation, Rate Music, and User Data."
             )
 
     else:
@@ -3136,9 +3133,9 @@ def run_navigation():
 def main():
     init_session()
 
-    # Handle Spotify OAuth only during local development.
-    # The deployed Streamlit app hides the account connection button.
-    if is_local_spotify_environment():
+    # Handle Spotify OAuth only on the local version.
+    # The deployed Streamlit Cloud version does not show account connection.
+    if not is_streamlit_cloud():
         spotify_callback = handle_spotify_callback()
 
         if spotify_callback == "connected":
