@@ -247,27 +247,8 @@ if current_role.casefold() != 'admin':
     st.stop()
 # A user needs at least 10 ratings before Collaborative Filtering is active.
 MINIMUM_RATINGS = 10
-
-# Locate the main SoundScope project folder.
-BASE_DIR = (
-    Path(__file__)
-    .resolve()
-    .parents[1]
-)
-
-# Use the same real rating dataset as the recommendation system.
-USER_RATINGS_FILE = (
-    BASE_DIR
-    / "data"
-    / "real_user_ratings.csv"
-)
-
-# Load registered SoundScope users.
-USERS_FILE = (
-    BASE_DIR
-    / "data"
-    / "users.csv"
-)
+USER_RATINGS_FILE = Path('data/real_user_ratings.csv')
+USERS_FILE = Path('data/users.csv')
 # Common songs create overlapping rating data so KNN can compare users.
 COMMON_RATING_TARGETS = [('Perfect', 'Ed Sheeran'), ('Shape of You', 'Ed Sheeran'), ('Believer', 'Imagine Dragons'), ('Baby', 'Justin Bieber'), ('Happier', 'Marshmello'), ('Bad Habits', 'Ed Sheeran'), ('Photograph', 'Ed Sheeran'), ("Don't Blame Me", 'Taylor Swift'), ('I Feel It Coming', 'The Weeknd'), ('STAY', 'Justin Bieber')]
 
