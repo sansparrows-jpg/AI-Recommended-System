@@ -35,6 +35,33 @@ TRACKS_DATA_PATH = (
     / "spotify-tracks-dataset-detailed.csv"
 )
 
+
+def is_local_spotify_environment():
+    """
+    Return True only when Spotify OAuth is configured
+    for localhost or 127.0.0.1.
+
+    This keeps the Connect Spotify button available
+    during local development but hides it on deployment.
+    """
+
+    try:
+        redirect_uri = str(
+            st.secrets.get(
+                "SPOTIFY_REDIRECT_URI",
+                "",
+            )
+        ).strip().casefold()
+
+    except Exception:
+        return False
+
+    return (
+        "127.0.0.1" in redirect_uri
+        or "localhost" in redirect_uri
+    )
+
+
 def apply_luxury_ui():
     """
     Change only the Streamlit appearance.
@@ -2914,35 +2941,36 @@ def render_discover_page():
 
         st.caption(role_label)
 
-        # Spotify Premium connection used by the
-        # Web Playback SDK.
-        if spotify_is_connected():
-            st.caption("Spotify · Connected")
+        # Show Spotify account connection only on localhost.
+        # Deployed users can still use the embedded Spotify players.
+        if is_local_spotify_environment():
+            if spotify_is_connected():
+                st.caption("Spotify · Connected")
 
-            if st.button(
-                "Disconnect Spotify",
-                key="disconnect_spotify",
-                width="stretch",
-            ):
-                disconnect_spotify()
-                st.rerun()
-
-        else:
-            try:
-                spotify_login_url = (
-                    get_spotify_login_url()
-                )
-
-                st.link_button(
-                    "Connect Spotify",
-                    spotify_login_url,
+                if st.button(
+                    "Disconnect Spotify",
+                    key="disconnect_spotify",
                     width="stretch",
-                )
+                ):
+                    disconnect_spotify()
+                    st.rerun()
 
-            except Exception as error:
-                st.caption(
-                    "Spotify configuration is missing."
-                )
+            else:
+                try:
+                    spotify_login_url = (
+                        get_spotify_login_url()
+                    )
+
+                    st.link_button(
+                        "Connect Spotify",
+                        spotify_login_url,
+                        width="stretch",
+                    )
+
+                except Exception:
+                    st.caption(
+                        "Spotify configuration is missing."
+                    )
 
         if st.button(
             "Logout",
@@ -3108,25 +3136,26 @@ def run_navigation():
 def main():
     init_session()
 
-    # Handle Spotify's OAuth redirect before rendering
-    # the normal SoundScope pages.
-    spotify_callback = handle_spotify_callback()
+    # Handle Spotify OAuth only during local development.
+    # The deployed Streamlit app hides the account connection button.
+    if is_local_spotify_environment():
+        spotify_callback = handle_spotify_callback()
 
-    if spotify_callback == "connected":
-        st.toast(
-            "Spotify connected successfully.",
-            icon="✅",
-        )
+        if spotify_callback == "connected":
+            st.toast(
+                "Spotify connected successfully.",
+                icon="✅",
+            )
 
-    elif spotify_callback == "error":
-        error_message = st.session_state.get(
-            "spotify_auth_error",
-            "Spotify connection failed.",
-        )
+        elif spotify_callback == "error":
+            error_message = st.session_state.get(
+                "spotify_auth_error",
+                "Spotify connection failed.",
+            )
 
-        st.error(
-            f"Spotify connection failed: {error_message}"
-        )
+            st.error(
+                f"Spotify connection failed: {error_message}"
+            )
 
     if not st.session_state["logged_in"]:
         render_auth_page()
