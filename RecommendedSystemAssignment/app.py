@@ -14,6 +14,13 @@ from models.history import add_search_history, clear_search_history, get_recent_
 from models.preprocessing import preprocess_data
 from models.ratings import get_rating_count, get_song_rating, save_rating
 
+from spotify_auth import (
+    disconnect_spotify,
+    get_spotify_login_url,
+    handle_spotify_callback,
+    spotify_is_connected,
+)
+
 RECENT_SEARCH_LIMIT = 20
 
 RATINGS_PATH = (
@@ -714,6 +721,10 @@ def init_session():
         st.session_state.setdefault(key, value)
 
 def logout():
+    # Spotify authorization belongs to the current
+    # SoundScope user session, so clear it on logout.
+    disconnect_spotify()
+
     keys_to_clear = [
         "selected_song",
         "selected_artist",
@@ -2904,6 +2915,36 @@ def render_discover_page():
 
         st.caption(role_label)
 
+        # Spotify account connection is available
+        # on both localhost and the deployed Streamlit app.
+        if spotify_is_connected():
+            st.caption("Spotify · Connected")
+
+            if st.button(
+                "Disconnect Spotify",
+                key="disconnect_spotify",
+                width="stretch",
+            ):
+                disconnect_spotify()
+                st.rerun()
+
+        else:
+            try:
+                spotify_login_url = (
+                    get_spotify_login_url()
+                )
+
+                st.link_button(
+                    "Connect Spotify",
+                    spotify_login_url,
+                    width="stretch",
+                )
+
+            except Exception:
+                st.caption(
+                    "Spotify configuration is missing."
+                )
+
         if st.button(
             "Logout",
             width="stretch",
@@ -3066,6 +3107,26 @@ def run_navigation():
 
 def main():
     init_session()
+
+    # Handle Spotify OAuth callback for both
+    # localhost and the deployed Streamlit app.
+    spotify_callback = handle_spotify_callback()
+
+    if spotify_callback == "connected":
+        st.toast(
+            "Spotify connected successfully.",
+            icon="✅",
+        )
+
+    elif spotify_callback == "error":
+        error_message = st.session_state.get(
+            "spotify_auth_error",
+            "Spotify connection failed.",
+        )
+
+        st.error(
+            f"Spotify connection failed: {error_message}"
+        )
 
     if not st.session_state["logged_in"]:
         render_auth_page()
